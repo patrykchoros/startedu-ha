@@ -35,3 +35,19 @@ Credentials are stored in Home Assistant's config entry storage. Do not commit
 real StartEdu credentials, cookies, captured authenticated HTML, or network traces
 to this repository.
 
+For local test-account discovery, credentials may be stored outside Git in an
+ignored file such as `.local/startedu-test.env`:
+
+```dotenv
+STARTEDU_USERNAME=
+STARTEDU_PASSWORD=
+STARTEDU_BASE_URL=https://s3.startedu.pl/Home/Client
+```
+
+Keep that file local only. Do not paste its contents into issues, wiki pages,
+fixtures, screenshots, or logs.
+
+The shared StartEdu test account is read-only for this project. It may be used
+to inspect account data, child switching, menus, payment status, and page
+structure. Do not use it to place meal orders, cancel meals, or confirm any
+StartEdu modal that would mutate account state.
