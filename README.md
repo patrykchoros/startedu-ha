@@ -46,3 +46,8 @@ STARTEDU_BASE_URL=https://s3.startedu.pl/Home/Client
 
 Keep that file local only. Do not paste its contents into issues, wiki pages,
 fixtures, screenshots, or logs.
+
+The shared StartEdu test account is read-only for this project. It may be used
+to inspect account data, child switching, menus, payment status, and page
+structure. Do not use it to place meal orders, cancel meals, or confirm any
+StartEdu modal that would mutate account state.

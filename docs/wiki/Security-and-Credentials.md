@@ -12,3 +12,16 @@ Project rules:
 - Redact credentials from diagnostics.
 - Use a test account for endpoint discovery.
 
+## Test Account Usage
+
+The shared StartEdu test account is read-only for this project. It may be used
+to inspect account data, child switching, menus, payment status, and page
+structure.
+
+Do not use the test account to:
+
+- Place meal orders.
+- Cancel meals.
+- Confirm cancellation dialogs or any other StartEdu modal that would mutate
+  account state.
+
