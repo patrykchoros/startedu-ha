@@ -10,7 +10,10 @@ __pycache__/
 venv/
 .env
 .env.*
+.local/
+.secrets/
+startedu-test.env
+startedu-test.json
 dist/
 build/
 *.egg-info/
-
