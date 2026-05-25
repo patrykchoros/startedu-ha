@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pl">
+  <body>
+    <div class="errors">
+      <div class="validation-summary-errors">
+        <ul>
+          <li>Logowanie nie powiodło się. Prosimy spróbować ponownie.</li>
+        </ul>
+      </div>
+    </div>
+    <form action="/User/SignIn" method="post" id="sign-in-form">
+      <label for="Identifier">E-mail, login lub numer ucznia</label>
+      <input id="Identifier" name="Identifier" type="text" value="invalid@example.invalid">
+      <label for="Password">Hasło</label>
+      <input id="Password" name="Password" type="password" value="">
+    </form>
+  </body>
+</html>
+

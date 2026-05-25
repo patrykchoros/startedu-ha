@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pl">
+  <body>
+    <form action="/User/SignIn" method="post" id="sign-in-form">
+      <label for="Identifier">E-mail, login lub numer ucznia</label>
+      <input id="Identifier" name="Identifier" type="text" value="">
+      <label for="Password">Hasło</label>
+      <input id="Password" name="Password" type="password" value="">
+      <input class="button login" name="submit" type="submit" value="Zaloguj się">
+    </form>
+    <script>
+      var form = document.getElementById('sign-in-form');
+      form.setAttribute(
+        'action',
+        (window.location.protocol + '//' + window.location.host)
+          .replace(/s\d+\./, '')
+          .replace('://', '://s' + (Math.floor(Math.random() * 6) + 1) + '.')
+          + form.getAttribute('action')
+          + window.location.search
+      );
+    </script>
+  </body>
+</html>
+

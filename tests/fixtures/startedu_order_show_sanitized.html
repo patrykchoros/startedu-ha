@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pl">
+  <body>
+    <h1>Zamówienie nr SE/ORDER_ID/5/2026 na maj 2026</h1>
+    <p>Wartość: 348,50 zł</p>
+    <div class="calendar">
+      <div class="day disabled" data-number="1">
+        <div class="date">piątek, 1.05</div>
+        <div class="info">Dzień niedostępny</div>
+      </div>
+      <div class="day green" data-number="4">
+        <div class="date">poniedziałek, 4.05</div>
+        <div class="container">
+          <h3>Obiad</h3>
+          <p>Przykładowa zupa, przykładowe drugie danie, kompot.</p>
+          <h3>Podwieczorek</h3>
+          <p>Przykładowy podwieczorek.</p>
+          <p>Cena: 20,50 zł</p>
+        </div>
+      </div>
+      <div class="day cancelled" data-number="18">
+        <div class="date">poniedziałek, 18.05</div>
+        <div class="container">
+          <div class="cancellation-mark">Rezygnacja</div>
+          <h3>Obiad</h3>
+          <p>Przykładowe anulowane menu.</p>
+          <p>Cena: 20,50 zł</p>
+        </div>
+      </div>
+      <div class="day green" data-number="26">
+        <div class="date">wtorek, 26.05</div>
+        <div class="container">
+          <h3>Obiad</h3>
+          <p>Przykładowe przyszłe menu.</p>
+          <h3>Podwieczorek</h3>
+          <p>Przykładowy przyszły podwieczorek.</p>
+          <p>Cena: 20,50 zł</p>
+          <a class="button small red" data-action="cancel-meal" href="#">Odwołaj posiłek</a>
+        </div>
+      </div>
+    </div>
+    <script>
+      $.ajax({
+        type: 'POST',
+        url: '/Order/CancelMeal?orderId=' + orderId + '&dayNumber=' + dayNumber
+      });
+      $.ajax({
+        type: 'POST',
+        url: '/Order/RevertMeal?orderId=' + orderId + '&dayNumber=' + dayNumber
+      });
+      $.ajax({
+        type: 'GET',
+        url: '/Order/EditMeal?orderId=' + orderId + '&dayNumber=' + dayNumber
+      });
+    </script>
+  </body>
+</html>
+
