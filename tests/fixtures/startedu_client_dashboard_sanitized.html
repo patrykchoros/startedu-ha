@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pl">
+  <body>
+    <nav>
+      <a class="commitments" data-menu-location="commitments" href="/Commitments">Zobowiązania</a>
+      <a class="refunds" data-menu-location="refunds" href="/Refunds">Zwroty</a>
+    </nav>
+    <header>
+      Konto <b>ACCOUNT_OWNER</b><br>
+      Subkonto <b>CHILD_1</b>
+    </header>
+    <ul class="clients">
+      <li><a class="current" href="/User/SwitchClient/CLIENT_ID_1">CHILD_1</a></li>
+      <li><a class="" href="/User/SwitchClient/CLIENT_ID_2">CHILD_2</a></li>
+    </ul>
+    <section class="current-month">
+      <h2>Bieżący miesiąc: maj</h2>
+      <div class="status">
+        Zamówienie SE/ORDER_ID/5/2026 na <b>maj</b> zostało opłacone.
+      </div>
+      <a class="button" href="/Order/Show/ORDER_ID">Wyświetl</a>
+      <a class="button red" href="/Order/Show/ORDER_ID">Odwołaj posiłki</a>
+      <div class="sticky-action">
+        <a
+          class="button red"
+          data-action="home-page-cancel-meal"
+          data-meal-day-number="26"
+          data-meal-order-id="ORDER_ID"
+          href="#"
+        >Odwołaj posiłek</a>
+      </div>
+    </section>
+    <section class="next-month">
+      <h2>Następny miesiąc: czerwiec</h2>
+      <p>
+        Tworzenie zamówień na nadchodzący miesiąc <b>czerwiec</b> nie jest
+        jeszcze możliwe. Planowana data uruchomienia zamówień to
+        <b>25 maja 2026</b>.
+      </p>
+    </section>
+    <section class="unpaid-commitments">
+      <h2>Nieopłacone zobowiązania</h2>
+      <p>Wszystkie zobowiązania są uregulowane.</p>
+    </section>
+  </body>
+</html>
+
