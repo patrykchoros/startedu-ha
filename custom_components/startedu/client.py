@@ -9,7 +9,17 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urljoin
 
-from .models import StartEduAccountData, StartEduMeal
+from .entity_model import meal_type_from_label
+from .models import (
+    MEAL_STATUS_CANCELLED,
+    MEAL_STATUS_NO_SCHOOL,
+    MEAL_STATUS_PAID,
+    MEAL_STATUS_UNKNOWN,
+    MEAL_STATUS_UNPAID,
+    StartEduAccountData,
+    StartEduChild,
+    StartEduMeal,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +29,29 @@ MONEY_RE = r"([+-]?\d+(?:[ .]\d{3})*(?:[,.]\d{1,2})?)\s*(?:pln|zl|zloty)"
 DATE_PATTERNS = (
     re.compile(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b"),
     re.compile(r"\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b"),
+    re.compile(
+        r"\b(\d{1,2})\s+"
+        r"(stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|"
+        r"wrzesnia|października|pazdziernika|listopada|grudnia)\s+"
+        r"(20\d{2})\b",
+        re.IGNORECASE,
+    ),
 )
+POLISH_MONTHS = {
+    "stycznia": 1,
+    "lutego": 2,
+    "marca": 3,
+    "kwietnia": 4,
+    "maja": 5,
+    "czerwca": 6,
+    "lipca": 7,
+    "sierpnia": 8,
+    "wrzesnia": 9,
+    "pazdziernika": 10,
+    "października": 10,
+    "listopada": 11,
+    "grudnia": 12,
+}
 
 
 class StartEduError(Exception):
@@ -45,6 +77,27 @@ class LoginForm:
     fields: dict[str, str]
     login_field: str | None
     password_field: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DashboardChildLink:
+    child_id: str
+    name: str
+    path: str
+    is_active: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DashboardSnapshot:
+    active_child_id: str
+    active_child_name: str
+    child_links: tuple[DashboardChildLink, ...]
+    order_paths: tuple[str, ...]
+    current_order_number: str | None = None
+    current_month_order_status: str = MEAL_STATUS_UNKNOWN
+    next_month_order_status: str = MEAL_STATUS_UNKNOWN
+    next_month_ordering_available: bool | None = None
+    next_order_opening_date: date | None = None
 
 
 class StartEduClient:
@@ -96,13 +149,88 @@ class StartEduClient:
         if not self._authenticated:
             await self.async_login()
 
+        fetched_at = datetime.now(timezone.utc)
         html = self._last_html
         if html is None:
             html = await self._request_text("get", self._base_url)
 
-        account_data = parse_account_html(html, datetime.now(timezone.utc))
+        account_data = await self._async_parse_full_account_data(html, fetched_at)
         self._last_html = None
         return account_data
+
+    async def _async_parse_full_account_data(
+        self,
+        dashboard_html: str,
+        fetched_at: datetime,
+    ) -> StartEduAccountData:
+        first_dashboard = parse_dashboard_html(dashboard_html)
+        children = []
+        child_links = first_dashboard.child_links or (
+            DashboardChildLink(
+                child_id=first_dashboard.active_child_id,
+                name=first_dashboard.active_child_name,
+                path="",
+                is_active=True,
+            ),
+        )
+
+        for child_link in child_links:
+            child_dashboard_html = dashboard_html
+            if not child_link.is_active and child_link.path:
+                child_dashboard_html = await self._request_text(
+                    "get",
+                    urljoin(self._base_url, child_link.path),
+                )
+            child_dashboard = parse_dashboard_html(child_dashboard_html)
+            meals = []
+            for order_path in child_dashboard.order_paths:
+                order_html = await self._request_text(
+                    "get",
+                    urljoin(self._base_url, order_path),
+                )
+                meals.extend(
+                    parse_order_html(
+                        order_html,
+                        child_dashboard.active_child_id,
+                        child_dashboard.active_child_name,
+                        child_dashboard.current_month_order_status,
+                    )
+                )
+
+            refunds = parse_refunds_html(
+                await self._request_text("get", urljoin(self._base_url, "/Refunds"))
+            )
+            unpaid_amount = parse_commitments_html(
+                await self._request_text("get", urljoin(self._base_url, "/Commitments"))
+            )
+
+            children.append(
+                StartEduChild(
+                    child_id=child_dashboard.active_child_id,
+                    name=child_dashboard.active_child_name,
+                    meals=tuple(meals),
+                    current_month_order_status=child_dashboard.current_month_order_status,
+                    next_month_order_status=child_dashboard.next_month_order_status,
+                    next_month_ordering_available=(
+                        child_dashboard.next_month_ordering_available
+                    ),
+                    next_order_opening_date=child_dashboard.next_order_opening_date,
+                    current_order_number=child_dashboard.current_order_number,
+                    refund_available=refunds,
+                    unpaid_amount=unpaid_amount,
+                )
+            )
+
+        return StartEduAccountData(
+            fetched_at=fetched_at,
+            children=tuple(children),
+            active_child_id=first_dashboard.active_child_id,
+            meals=tuple(meal for child in children for meal in child.meals),
+            refunds=next(
+                (child.refund_available for child in children if child.refund_available),
+                None,
+            ),
+        )
 
     async def _request_text(self, method: str, url: str, **kwargs: Any) -> str:
         request = getattr(self._session, method)
@@ -150,14 +278,167 @@ def parse_account_html(
     text = html_to_text(html)
     rows = extract_table_rows(html)
     meals = tuple(sorted(_parse_meals(rows), key=lambda meal: (meal.date, meal.name)))
+    dashboard = parse_dashboard_html(html)
     balance = _extract_money_near_label(text, ("saldo", "balance"))
     refunds = _extract_money_near_label(text, ("zwroty", "refund", "refunds"))
+    child = StartEduChild(
+        child_id=dashboard.active_child_id,
+        name=dashboard.active_child_name,
+        meals=meals,
+        current_month_order_status=dashboard.current_month_order_status,
+        next_month_order_status=dashboard.next_month_order_status,
+        next_month_ordering_available=dashboard.next_month_ordering_available,
+        next_order_opening_date=dashboard.next_order_opening_date,
+        current_order_number=dashboard.current_order_number,
+        refund_available=refunds,
+        unpaid_amount=balance,
+    )
     return StartEduAccountData(
         fetched_at=fetched_at,
+        children=(child,) if meals else (),
+        active_child_id=dashboard.active_child_id,
         meals=meals,
         balance=balance,
         refunds=refunds,
     )
+
+
+def parse_dashboard_html(html: str) -> DashboardSnapshot:
+    text = html_to_text(html)
+    child_links = tuple(_extract_child_links(html))
+    active_link = next((child for child in child_links if child.is_active), None)
+    subaccount_match = re.search(r"Subkonto\s*\|\s*([^|]+)", text)
+    active_child_name = (
+        active_link.name
+        if active_link is not None
+        else (subaccount_match.group(1).strip() if subaccount_match else "StartEdu")
+    )
+    active_child_id = active_link.child_id if active_link is not None else "default"
+    order_paths = tuple(
+        dict.fromkeys(re.findall(r'href="(/Order/Show/[^"]+)"', html))
+    )
+    current_order = _extract_order_number(text)
+    current_status = _extract_order_status(text)
+    next_available = None
+    next_status = MEAL_STATUS_UNKNOWN
+    normalized_text = _strip_accents(text).casefold()
+    if (
+        "tworzenie zamowien" in normalized_text
+        and "nie jest jeszcze mozliwe" in normalized_text
+    ):
+        next_available = False
+        next_status = "not_available"
+    elif "mozliwe" in normalized_text and "nadchodzacy miesiac" in normalized_text:
+        next_available = True
+        next_status = "available"
+    opening_date = _extract_date(text)
+    return DashboardSnapshot(
+        active_child_id=active_child_id,
+        active_child_name=active_child_name,
+        child_links=child_links,
+        order_paths=order_paths,
+        current_order_number=current_order,
+        current_month_order_status=current_status,
+        next_month_order_status=next_status,
+        next_month_ordering_available=next_available,
+        next_order_opening_date=opening_date,
+    )
+
+
+def parse_order_html(
+    html: str,
+    child_id: str = "default",
+    child_name: str = "StartEdu",
+    default_status: str = MEAL_STATUS_UNKNOWN,
+) -> tuple[StartEduMeal, ...]:
+    order_number = _extract_order_number(html_to_text(html))
+    year, month = _extract_order_year_month(html)
+    if year is None or month is None:
+        return ()
+
+    meals: list[StartEduMeal] = []
+    for day_match in re.finditer(
+        r'<div class="day\s+([^"]*)"[^>]*data-number="(\d+)"[^>]*>'
+        r'(.*?)(?=<div class="day\s|</div>\s*</div>\s*<script|<script)',
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
+    ):
+        classes, day_number, block = day_match.groups()
+        day = date(year, month, int(day_number))
+        day_text = html_to_text(block)
+        price = _extract_money_near_label(day_text, ("cena",)) or _extract_first_money(
+            day_text
+        )
+        can_cancel = 'data-action="cancel-meal"' in block
+        day_status = _status_from_day_block(classes, day_text, default_status)
+
+        if day_status == MEAL_STATUS_NO_SCHOOL:
+            meals.append(
+                StartEduMeal(
+                    meal_id=f"{order_number or 'order'}-{day_number}-no-school",
+                    date=day,
+                    name="No school meal",
+                    menu=None,
+                    meal_type="other",
+                    child_id=child_id,
+                    child_name=child_name,
+                    status=MEAL_STATUS_NO_SCHOOL,
+                    order_number=order_number,
+                    price=price,
+                    can_cancel=False,
+                )
+            )
+            continue
+
+        slots = _extract_meal_slots(block)
+        for label, menu in slots:
+            meals.append(
+                StartEduMeal(
+                    meal_id=(
+                        f"{order_number or 'order'}-"
+                        f"{day_number}-{meal_type_from_label(label)}"
+                    ),
+                    date=day,
+                    name=label,
+                    menu=menu,
+                    meal_type=meal_type_from_label(label),
+                    child_id=child_id,
+                    child_name=child_name,
+                    status=day_status,
+                    order_number=order_number,
+                    price=price,
+                    can_cancel=can_cancel,
+                )
+            )
+    return tuple(meals)
+
+
+def parse_refunds_html(html: str) -> Decimal | None:
+    text = html_to_text(html)
+    match = re.search(r"Aktualnie\s+" + MONEY_RE, _strip_accents(text), re.IGNORECASE)
+    if match:
+        return _parse_decimal(match.group(1))
+    return _extract_money_near_label(text, ("zwroty", "refund"))
+
+
+def parse_commitments_html(html: str) -> Decimal | None:
+    text = html_to_text(html)
+    rows = extract_table_rows(html)
+    values = []
+    for row in rows:
+        normalized = _strip_accents(row).casefold()
+        if "oplata za posilki" not in normalized:
+            continue
+        money_values = re.findall(MONEY_RE, normalized, re.IGNORECASE)
+        if money_values:
+            parsed_value = _parse_decimal(money_values[-1])
+            if parsed_value is not None:
+                values.append(parsed_value)
+    if values:
+        return sum(values, Decimal("0"))
+    if "wszystkie zobowiazania sa uregulowane" in _strip_accents(text).casefold():
+        return Decimal("0")
+    return None
 
 
 def html_to_text(html: str) -> str:
@@ -202,6 +483,8 @@ def _parse_meals(rows: list[str]) -> list[StartEduMeal]:
                 meal_id=meal_id,
                 date=meal_date,
                 name=name,
+                menu=None,
+                meal_type=meal_type_from_label(name),
                 child_name=child_name,
                 status=status,
                 price=price,
@@ -227,6 +510,10 @@ def _extract_date(text: str) -> date | None:
             continue
         if pattern.pattern.startswith("\\b(20"):
             year, month, day = (int(group) for group in match.groups())
+        elif "stycznia" in pattern.pattern:
+            day = int(match.group(1))
+            month = POLISH_MONTHS[_strip_accents(match.group(2)).casefold()]
+            year = int(match.group(3))
         else:
             day, month, year = (int(group) for group in match.groups())
         try:
@@ -268,9 +555,13 @@ def _parse_decimal(value: str) -> Decimal | None:
 def _extract_status(text: str) -> str | None:
     normalized = _strip_accents(text).casefold()
     if any(marker in normalized for marker in ("cancelled", "canceled", "odwol")):
-        return "cancelled"
-    if any(marker in normalized for marker in ("ordered", "active", "zamow", "paid")):
-        return "ordered"
+        return MEAL_STATUS_CANCELLED
+    if any(marker in normalized for marker in ("nieoplac", "unpaid")):
+        return MEAL_STATUS_UNPAID
+    if any(
+        marker in normalized for marker in ("ordered", "active", "zamow", "paid", "oplac")
+    ):
+        return MEAL_STATUS_PAID
     return None
 
 
@@ -292,6 +583,85 @@ def _extract_meal_id(text: str) -> str | None:
     if match:
         return match.group(1)
     return None
+
+
+def _extract_child_links(html: str) -> list[DashboardChildLink]:
+    links = []
+    for match in re.finditer(
+        r'<a\s+class="([^"]*)" href="(/User/SwitchClient/([^"]+))">([^<]+)</a>',
+        html,
+        flags=re.IGNORECASE,
+    ):
+        class_name, path, child_id, child_name = match.groups()
+        links.append(
+            DashboardChildLink(
+                child_id=child_id,
+                name=html_to_text(child_name),
+                path=path,
+                is_active="current" in class_name.split(),
+            )
+        )
+    return links
+
+
+def _extract_order_number(text: str) -> str | None:
+    match = re.search(r"SE/[A-Za-z0-9_-]+/\d{1,2}/20\d{2}", text)
+    return match.group(0) if match else None
+
+
+def _extract_order_year_month(html: str) -> tuple[int | None, int | None]:
+    text = html_to_text(html)
+    match = re.search(r"SE/[A-Za-z0-9_-]+/(\d{1,2})/(20\d{2})", text)
+    if match:
+        return int(match.group(2)), int(match.group(1))
+    return None, None
+
+
+def _extract_order_status(text: str) -> str:
+    normalized = _strip_accents(text).casefold()
+    if "zostalo oplacone" in normalized or "oplacone" in normalized:
+        return MEAL_STATUS_PAID
+    if "nieoplacone" in normalized or "do zaplaty" in normalized:
+        return MEAL_STATUS_UNPAID
+    return MEAL_STATUS_UNKNOWN
+
+
+def _status_from_day_block(classes: str, text: str, default_status: str) -> str:
+    normalized = _strip_accents(f"{classes} {text}").casefold()
+    if "cancelled" in normalized or "rezygnacja" in normalized:
+        return MEAL_STATUS_CANCELLED
+    if "disabled" in normalized or "dzien niedostepny" in normalized:
+        return MEAL_STATUS_NO_SCHOOL
+    if default_status in {MEAL_STATUS_PAID, MEAL_STATUS_UNPAID}:
+        return default_status
+    return MEAL_STATUS_UNKNOWN
+
+
+def _extract_meal_slots(block: str) -> list[tuple[str, str]]:
+    slots = []
+    matches = list(
+        re.finditer(
+            r"<h[1-6][^>]*>(.*?)</h[1-6]>",
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    )
+    for index, match in enumerate(matches):
+        label = html_to_text(match.group(1))
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(block)
+        fragment = block[start:end]
+        fragment = re.sub(r"Cena:\s*" + MONEY_RE, "", fragment, flags=re.IGNORECASE)
+        fragment = re.sub(
+            r"<a\b[^>]*>.*?</a>",
+            "",
+            fragment,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        menu = html_to_text(fragment)
+        if label and menu:
+            slots.append((label, menu))
+    return slots
 
 
 def _strip_accents(value: str) -> str:

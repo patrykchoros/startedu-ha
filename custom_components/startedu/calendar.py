@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
@@ -11,7 +10,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import StartEduDataUpdateCoordinator
 from .entity import StartEduEntity
-from .models import StartEduMeal
+from .entity_model import (
+    calendar_meals,
+    meal_event_description,
+    meal_event_summary,
+    meal_time_window,
+)
+from .models import StartEduChild, StartEduMeal
 
 
 async def async_setup_entry(
@@ -20,7 +25,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: StartEduDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([StartEduMealCalendar(coordinator, entry)])
+    children = coordinator.data.child_accounts if coordinator.data else ()
+    async_add_entities(
+        [StartEduMealCalendar(coordinator, entry, child) for child in children]
+    )
 
 
 class StartEduMealCalendar(StartEduEntity, CalendarEntity):
@@ -32,16 +40,18 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
         self,
         coordinator: StartEduDataUpdateCoordinator,
         entry: ConfigEntry,
+        child: StartEduChild,
     ) -> None:
-        super().__init__(coordinator, entry)
-        self._attr_unique_id = f"{entry.entry_id}_meals"
+        super().__init__(coordinator, entry, child)
+        self._child = child
+        self._attr_unique_id = f"{entry.entry_id}_{child.child_id}_meals"
 
     @property
     def event(self) -> CalendarEvent | None:
-        meal = self.coordinator.data.next_meal if self.coordinator.data else None
+        meal = self._child.next_meal
         if meal is None:
             return None
-        return _meal_to_event(meal)
+        return _meal_to_event(meal, self.coordinator.entry.options)
 
     async def async_get_events(
         self,
@@ -52,31 +62,26 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
         if self.coordinator.data is None:
             return []
 
-        start = _as_date(start_date)
-        end = _as_date(end_date)
+        start = _as_datetime(start_date)
+        end = _as_datetime(end_date)
         return [
-            _meal_to_event(meal)
-            for meal in self.coordinator.data.meals
-            if start <= meal.date < end
+            _meal_to_event(meal, self.coordinator.entry.options)
+            for meal in calendar_meals(self._child)
+            if start <= meal_time_window(meal, self.coordinator.entry.options).start < end
         ]
 
 
-def _meal_to_event(meal: StartEduMeal) -> CalendarEvent:
-    description_lines = []
-    attrs = meal.as_attributes()
-    for key in ("child_name", "status", "price", "can_cancel"):
-        if key in attrs:
-            description_lines.append(f"{key}: {attrs[key]}")
+def _meal_to_event(meal: StartEduMeal, options: dict[str, object]) -> CalendarEvent:
+    window = meal_time_window(meal, options)
     return CalendarEvent(
-        summary=meal.summary,
-        start=meal.date,
-        end=meal.end_date,
-        description="\n".join(description_lines) or None,
+        summary=meal_event_summary(meal),
+        start=window.start,
+        end=window.end,
+        description=meal_event_description(meal),
     )
 
 
-def _as_date(value: date | datetime) -> date:
+def _as_datetime(value: date | datetime) -> datetime:
     if isinstance(value, datetime):
-        return value.date()
-    return value
-
+        return value
+    return datetime.combine(value, datetime.min.time())

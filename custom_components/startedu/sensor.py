@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Callable
 
@@ -10,93 +10,139 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import StartEduDataUpdateCoordinator
 from .entity import StartEduEntity
-from .models import StartEduAccountData
+from .entity_model import day_menu_attributes, day_menu_state, day_status
+from .models import StartEduChild
 
 
 @dataclass(frozen=True, slots=True)
 class StartEduSensorDescription:
     key: str
     translation_key: str
-    value_fn: Callable[[StartEduAccountData, StartEduDataUpdateCoordinator], Any]
-    attributes_fn: Callable[[StartEduAccountData], dict[str, Any]] | None = None
+    value_fn: Callable[[StartEduChild, StartEduDataUpdateCoordinator], Any]
+    attributes_fn: (
+        Callable[[StartEduChild, StartEduDataUpdateCoordinator], dict[str, Any]]
+        | None
+    ) = None
     device_class: SensorDeviceClass | None = None
     native_unit_of_measurement: str | None = None
     entity_category: EntityCategory | None = None
 
 
-def _next_meal_value(
-    data: StartEduAccountData,
+def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:
+    return dt_util.now().date() + timedelta(days=offset_days)
+
+
+def _today_menu_value(
+    child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> str | None:
-    meal = data.next_meal
-    return meal.summary if meal else None
+    return day_menu_state(child, _target_date(coordinator, 0))
 
 
-def _balance_value(
-    data: StartEduAccountData,
+def _tomorrow_menu_value(
+    child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> Decimal | None:
-    return data.balance
+) -> str | None:
+    return day_menu_state(child, _target_date(coordinator, 1))
 
 
-def _refunds_value(
-    data: StartEduAccountData,
+def _today_status_value(
+    child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> Decimal | None:
-    return data.refunds
+) -> str:
+    return day_status(child, _target_date(coordinator, 0))
+
+
+def _tomorrow_status_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> str:
+    return day_status(child, _target_date(coordinator, 1))
 
 
 def _last_successful_update_value(
-    data: StartEduAccountData,
+    child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> datetime:
-    return data.fetched_at
+    return coordinator.data.fetched_at
 
 
-def _sync_status_value(
-    data: StartEduAccountData,
+def _current_month_order_status_value(
+    child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> str:
-    return "ok" if coordinator.last_update_success else "error"
+    return child.current_month_order_status
 
 
-def _next_meal_attributes(data: StartEduAccountData) -> dict[str, Any]:
-    if data.next_meal is None:
-        return {}
-    return data.next_meal.as_attributes()
+def _next_month_order_status_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> str:
+    return child.next_month_order_status
 
 
-def _sync_attributes(data: StartEduAccountData) -> dict[str, Any]:
-    return {
-        "meal_count": len(data.meals),
-        "last_successful_update": data.fetched_at.isoformat(),
-    }
+def _refund_available_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> Decimal | None:
+    return child.refund_available
+
+
+def _unpaid_amount_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> Decimal | None:
+    return child.unpaid_amount
+
+
+def _next_order_opening_date_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> date | None:
+    return child.next_order_opening_date
+
+
+def _today_menu_attributes(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> dict[str, Any]:
+    return day_menu_attributes(child, _target_date(coordinator, 0))
+
+
+def _tomorrow_menu_attributes(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> dict[str, Any]:
+    return day_menu_attributes(child, _target_date(coordinator, 1))
 
 
 SENSOR_DESCRIPTIONS: tuple[StartEduSensorDescription, ...] = (
     StartEduSensorDescription(
-        key="next_meal",
-        translation_key="next_meal",
-        value_fn=_next_meal_value,
-        attributes_fn=_next_meal_attributes,
+        key="today_menu",
+        translation_key="today_menu",
+        value_fn=_today_menu_value,
+        attributes_fn=_today_menu_attributes,
     ),
     StartEduSensorDescription(
-        key="balance",
-        translation_key="balance",
-        value_fn=_balance_value,
-        device_class=SensorDeviceClass.MONETARY,
-        native_unit_of_measurement="PLN",
+        key="tomorrow_menu",
+        translation_key="tomorrow_menu",
+        value_fn=_tomorrow_menu_value,
+        attributes_fn=_tomorrow_menu_attributes,
     ),
     StartEduSensorDescription(
-        key="refunds",
-        translation_key="refunds",
-        value_fn=_refunds_value,
-        device_class=SensorDeviceClass.MONETARY,
-        native_unit_of_measurement="PLN",
+        key="today_meal_status",
+        translation_key="today_meal_status",
+        value_fn=_today_status_value,
+    ),
+    StartEduSensorDescription(
+        key="tomorrow_meal_status",
+        translation_key="tomorrow_meal_status",
+        value_fn=_tomorrow_status_value,
     ),
     StartEduSensorDescription(
         key="last_successful_update",
@@ -106,11 +152,34 @@ SENSOR_DESCRIPTIONS: tuple[StartEduSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     StartEduSensorDescription(
-        key="sync_status",
-        translation_key="sync_status",
-        value_fn=_sync_status_value,
-        attributes_fn=_sync_attributes,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        key="current_month_order_status",
+        translation_key="current_month_order_status",
+        value_fn=_current_month_order_status_value,
+    ),
+    StartEduSensorDescription(
+        key="next_month_order_status",
+        translation_key="next_month_order_status",
+        value_fn=_next_month_order_status_value,
+    ),
+    StartEduSensorDescription(
+        key="refund_available",
+        translation_key="refund_available",
+        value_fn=_refund_available_value,
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="PLN",
+    ),
+    StartEduSensorDescription(
+        key="unpaid_amount",
+        translation_key="unpaid_amount",
+        value_fn=_unpaid_amount_value,
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="PLN",
+    ),
+    StartEduSensorDescription(
+        key="next_order_opening_date",
+        translation_key="next_order_opening_date",
+        value_fn=_next_order_opening_date_value,
+        device_class=SensorDeviceClass.DATE,
     ),
 )
 
@@ -121,9 +190,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: StartEduDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    children = coordinator.data.child_accounts if coordinator.data else ()
     async_add_entities(
         [
-            StartEduSensor(coordinator, entry, description)
+            StartEduSensor(coordinator, entry, child, description)
+            for child in children
             for description in SENSOR_DESCRIPTIONS
         ]
     )
@@ -136,11 +207,13 @@ class StartEduSensor(StartEduEntity, SensorEntity):
         self,
         coordinator: StartEduDataUpdateCoordinator,
         entry: ConfigEntry,
+        child: StartEduChild,
         description: StartEduSensorDescription,
     ) -> None:
-        super().__init__(coordinator, entry)
+        super().__init__(coordinator, entry, child)
+        self._child = child
         self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_unique_id = f"{entry.entry_id}_{child.child_id}_{description.key}"
         self._attr_translation_key = description.translation_key
         self._attr_device_class = description.device_class
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement
@@ -150,11 +223,17 @@ class StartEduSensor(StartEduEntity, SensorEntity):
     def native_value(self) -> Any:
         if self.coordinator.data is None:
             return None
-        return self.entity_description.value_fn(self.coordinator.data, self.coordinator)
+        return self.entity_description.value_fn(self._child, self.coordinator)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        if self.coordinator.data is None or self.entity_description.attributes_fn is None:
+        if (
+            self.coordinator.data is None
+            or self.entity_description.attributes_fn is None
+        ):
             return None
-        attributes = self.entity_description.attributes_fn(self.coordinator.data)
+        attributes = self.entity_description.attributes_fn(
+            self._child,
+            self.coordinator,
+        )
         return attributes or None

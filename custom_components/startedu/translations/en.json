@@ -34,7 +34,11 @@
       "init": {
         "title": "StartEdu options",
         "data": {
-          "scan_interval": "Polling interval in minutes"
+          "scan_interval": "Polling interval in minutes",
+          "breakfast_time": "Breakfast time",
+          "lunch_time": "Lunch time",
+          "afternoon_snack_time": "Afternoon snack time",
+          "other_meal_time": "Other meal time"
         }
       }
     }
@@ -49,6 +53,18 @@
       "next_meal": {
         "name": "Next meal"
       },
+      "today_menu": {
+        "name": "Today menu"
+      },
+      "tomorrow_menu": {
+        "name": "Tomorrow menu"
+      },
+      "today_meal_status": {
+        "name": "Today meal status"
+      },
+      "tomorrow_meal_status": {
+        "name": "Tomorrow meal status"
+      },
       "balance": {
         "name": "Balance"
       },
@@ -60,8 +76,39 @@
       },
       "sync_status": {
         "name": "Sync status"
+      },
+      "current_month_order_status": {
+        "name": "Current month order status"
+      },
+      "next_month_order_status": {
+        "name": "Next month order status"
+      },
+      "refund_available": {
+        "name": "Refund available"
+      },
+      "unpaid_amount": {
+        "name": "Unpaid amount"
+      },
+      "next_order_opening_date": {
+        "name": "Next order opening date"
+      }
+    },
+    "binary_sensor": {
+      "has_food_today": {
+        "name": "Has food today"
+      },
+      "has_food_tomorrow": {
+        "name": "Has food tomorrow"
+      },
+      "can_cancel_today_meal": {
+        "name": "Can cancel today's meal"
+      },
+      "can_cancel_tomorrow_meal": {
+        "name": "Can cancel tomorrow's meal"
+      },
+      "next_month_ordering_available": {
+        "name": "Next month ordering available"
       }
     }
   }
 }
-

@@ -10,14 +10,24 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import CannotConnect, InvalidAuth, StartEduClient
 from .const import (
+    CONF_AFTERNOON_SNACK_TIME,
     CONF_BASE_URL,
+    CONF_BREAKFAST_TIME,
+    CONF_LUNCH_TIME,
+    CONF_OTHER_MEAL_TIME,
     CONF_SCAN_INTERVAL,
+    DEFAULT_AFTERNOON_SNACK_TIME,
     DEFAULT_BASE_URL,
+    DEFAULT_BREAKFAST_TIME,
+    DEFAULT_LUNCH_TIME,
+    DEFAULT_OTHER_MEAL_TIME,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
     MAX_SCAN_INTERVAL_MINUTES,
     MIN_SCAN_INTERVAL_MINUTES,
 )
+
+TIME_VALUE = vol.All(str, vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$"))
 
 
 def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -158,8 +168,35 @@ class StartEduOptionsFlow(config_entries.OptionsFlow):
                             min=MIN_SCAN_INTERVAL_MINUTES,
                             max=MAX_SCAN_INTERVAL_MINUTES,
                         ),
-                    )
+                    ),
+                    vol.Required(
+                        CONF_BREAKFAST_TIME,
+                        default=self._config_entry.options.get(
+                            CONF_BREAKFAST_TIME,
+                            DEFAULT_BREAKFAST_TIME,
+                        ),
+                    ): TIME_VALUE,
+                    vol.Required(
+                        CONF_LUNCH_TIME,
+                        default=self._config_entry.options.get(
+                            CONF_LUNCH_TIME,
+                            DEFAULT_LUNCH_TIME,
+                        ),
+                    ): TIME_VALUE,
+                    vol.Required(
+                        CONF_AFTERNOON_SNACK_TIME,
+                        default=self._config_entry.options.get(
+                            CONF_AFTERNOON_SNACK_TIME,
+                            DEFAULT_AFTERNOON_SNACK_TIME,
+                        ),
+                    ): TIME_VALUE,
+                    vol.Required(
+                        CONF_OTHER_MEAL_TIME,
+                        default=self._config_entry.options.get(
+                            CONF_OTHER_MEAL_TIME,
+                            DEFAULT_OTHER_MEAL_TIME,
+                        ),
+                    ): TIME_VALUE,
                 }
             ),
         )
-
