@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect StartEdu",
+        "description": "Enter your StartEdu credentials. They are stored only in Home Assistant.",
+        "data": {
+          "username": "Login, email, or student number",
+          "password": "Password",
+          "base_url": "StartEdu URL"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate StartEdu",
+        "description": "StartEdu rejected the saved credentials. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to StartEdu.",
+      "invalid_auth": "StartEdu rejected the credentials.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This StartEdu account is already configured.",
+      "reauth_failed": "Could not find the StartEdu entry to reauthenticate.",
+      "reauth_successful": "StartEdu reauthentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "StartEdu options",
+        "data": {
+          "scan_interval": "Polling interval in minutes"
+        }
+      }
+    }
+  },
+  "entity": {
+    "calendar": {
+      "meals": {
+        "name": "Meals"
+      }
+    },
+    "sensor": {
+      "next_meal": {
+        "name": "Next meal"
+      },
+      "balance": {
+        "name": "Balance"
+      },
+      "refunds": {
+        "name": "Refunds"
+      },
+      "last_successful_update": {
+        "name": "Last successful update"
+      },
+      "sync_status": {
+        "name": "Sync status"
+      }
+    }
+  }
+}
+

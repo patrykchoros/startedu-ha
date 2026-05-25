@@ -1,0 +1,14 @@
+{
+  "domain": "startedu",
+  "name": "StartEdu",
+  "codeowners": [
+    "@patrykchoros"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/patrykchoros/startedu-ha",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/patrykchoros/startedu-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
+
