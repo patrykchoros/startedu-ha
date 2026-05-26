@@ -3,6 +3,9 @@
 StartEdu credentials are collected through the Home Assistant UI config flow and
 stored in Home Assistant config entry storage.
 
+The StartEdu service URL is built into the integration. Users should not need
+to enter or store a StartEdu URL during normal Home Assistant setup.
+
 Project rules:
 
 - Do not commit real credentials.
