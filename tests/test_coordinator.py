@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 import sys
 import types
 import unittest
@@ -97,9 +98,15 @@ _install_homeassistant_stubs()
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.startedu.client import CannotConnect, InvalidAuth
+from custom_components.startedu.client import CannotConnect, InvalidAuth, StartEduError
 from custom_components.startedu.coordinator import StartEduDataUpdateCoordinator
-from custom_components.startedu.models import StartEduAccountData, StartEduChild
+from custom_components.startedu.models import (
+    MEAL_STATUS_CANCELLED,
+    MEAL_STATUS_PAID,
+    StartEduAccountData,
+    StartEduChild,
+    StartEduMeal,
+)
 
 
 class FakeHass:
@@ -182,6 +189,16 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(UpdateFailed):
             await coordinator._async_update_data()
 
+    async def test_startedu_downtime_becomes_update_failed(self) -> None:
+        coordinator = StartEduDataUpdateCoordinator(
+            FakeHass(),
+            FakeClient(error=StartEduError("maintenance")),
+            FakeEntry(),
+        )
+
+        with self.assertRaises(UpdateFailed):
+            await coordinator._async_update_data()
+
     async def test_invalid_auth_becomes_config_entry_auth_failed(self) -> None:
         coordinator = StartEduDataUpdateCoordinator(
             FakeHass(),
@@ -191,3 +208,72 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(ConfigEntryAuthFailed):
             await coordinator._async_update_data()
+
+    async def test_empty_schedule_is_valid_account_data(self) -> None:
+        account_data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 26, 7, 0, tzinfo=timezone.utc),
+            children=(),
+            meals=(),
+            balance=Decimal("0.00"),
+        )
+        coordinator = StartEduDataUpdateCoordinator(
+            FakeHass(),
+            FakeClient(account_data),
+            FakeEntry(),
+        )
+
+        result = await coordinator._async_update_data()
+
+        self.assertEqual(result.child_accounts, ())
+        self.assertIsNone(result.next_meal)
+
+    async def test_cancelled_meals_and_missing_balance_are_preserved(self) -> None:
+        cancelled_meal = StartEduMeal(
+            meal_id="MEAL-27-LUNCH",
+            date=date(2026, 5, 27),
+            name="Obiad",
+            menu="Naleśniki.",
+            meal_type="lunch",
+            child_id="CHILD-ID-1",
+            child_name="Child 1",
+            status=MEAL_STATUS_CANCELLED,
+            can_cancel=False,
+        )
+        active_meal = StartEduMeal(
+            meal_id="MEAL-28-LUNCH",
+            date=date(2026, 5, 28),
+            name="Obiad",
+            menu="Zupa.",
+            meal_type="lunch",
+            child_id="CHILD-ID-1",
+            child_name="Child 1",
+            status=MEAL_STATUS_PAID,
+            can_cancel=True,
+        )
+        account_data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 26, 7, 0, tzinfo=timezone.utc),
+            children=(
+                StartEduChild(
+                    child_id="CHILD-ID-1",
+                    name="Child 1",
+                    meals=(cancelled_meal, active_meal),
+                    refund_available=None,
+                    unpaid_amount=None,
+                ),
+            ),
+            balance=None,
+        )
+        coordinator = StartEduDataUpdateCoordinator(
+            FakeHass(),
+            FakeClient(account_data),
+            FakeEntry(),
+        )
+
+        result = await coordinator._async_update_data()
+
+        self.assertIsNone(result.balance)
+        self.assertEqual(
+            result.child_accounts[0].meals[0].status,
+            MEAL_STATUS_CANCELLED,
+        )
+        self.assertIs(result.next_meal, active_meal)
