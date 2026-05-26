@@ -17,12 +17,15 @@ startedu.__path__ = [str(ROOT / "custom_components" / "startedu")]
 sys.modules.setdefault("custom_components.startedu", startedu)
 
 from custom_components.startedu.client import (
+    InvalidAuth,
+    StartEduClient,
     extract_login_form,
     parse_account_html,
     parse_commitments_html,
     parse_dashboard_html,
     parse_order_html,
     parse_refunds_html,
+    safe_url_for_log,
 )
 
 
@@ -63,6 +66,17 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertEqual(form.method, "post")
         self.assertEqual(form.fields["csrf"], "token")
         self.assertEqual(form.login_field, "Login")
+        self.assertEqual(form.password_field, "Password")
+
+    def test_extract_login_form_detects_startedu_identifier_field(self) -> None:
+        html = Path("tests/fixtures/startedu_login_page_sanitized.html").read_text(
+            encoding="utf-8"
+        )
+
+        form = extract_login_form(html)
+
+        self.assertEqual(form.action, "/User/SignIn")
+        self.assertEqual(form.login_field, "Identifier")
         self.assertEqual(form.password_field, "Password")
 
     def test_parse_dashboard_html_extracts_child_and_order_state(self) -> None:
@@ -117,3 +131,96 @@ class StartEduClientParserTests(unittest.TestCase):
 
         self.assertEqual(parse_refunds_html(refunds_html), Decimal("20.50"))
         self.assertEqual(parse_commitments_html(commitments_html), Decimal("0.00"))
+
+
+class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalid_login_logs_only_safe_diagnostics(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(
+                    Path("tests/fixtures/startedu_login_page_sanitized.html").read_text(
+                        encoding="utf-8"
+                    ),
+                    url="https://startedu.pl/?redirect=%2fHome%2fClient",
+                )
+            ],
+            post_responses=[
+                _TextResponse(
+                    Path(
+                        "tests/fixtures/startedu_invalid_login_sanitized.html"
+                    ).read_text(encoding="utf-8"),
+                    url=(
+                        "https://s1.startedu.pl/User/SignIn"
+                        "?redirect=%2fHome%2fClient"
+                    ),
+                )
+            ],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s3.startedu.pl/Home/Client",
+        )
+
+        with self.assertLogs("custom_components.startedu.client", "WARNING") as logs:
+            with self.assertRaises(InvalidAuth):
+                await client.async_login()
+
+        logged = "\n".join(logs.output)
+        self.assertIn("StartEdu login diagnostic", logged)
+        self.assertIn("invalid_auth", logged)
+        self.assertIn("base_url=https://s3.startedu.pl/Home/Client/", logged)
+        self.assertIn("request_url=https://s3.startedu.pl/User/SignIn", logged)
+        self.assertIn("response_url=https://s1.startedu.pl/User/SignIn", logged)
+        self.assertIn("login_field=Identifier", logged)
+        self.assertIn("password_field=Password", logged)
+        self.assertNotIn("family@example.test", logged)
+        self.assertNotIn("secret-password", logged)
+        self.assertNotIn("redirect=", logged)
+        self.assertNotIn("Logowanie nie powiodło", logged)
+
+    def test_safe_url_for_log_drops_query_and_credentials(self) -> None:
+        self.assertEqual(
+            safe_url_for_log("https://user:pass@example.test/path?token=secret"),
+            "https://example.test/path",
+        )
+
+
+class _LoginSession:
+    def __init__(
+        self,
+        *,
+        get_responses: list["_TextResponse"],
+        post_responses: list["_TextResponse"],
+    ) -> None:
+        self.get_responses = get_responses
+        self.post_responses = post_responses
+
+    def get(self, url: str, **kwargs: object) -> "_TextResponse":
+        return self.get_responses.pop(0)
+
+    def post(self, url: str, **kwargs: object) -> "_TextResponse":
+        return self.post_responses.pop(0)
+
+
+class _TextResponse:
+    def __init__(
+        self,
+        text: str,
+        *,
+        status: int = 200,
+        url: str = "https://startedu.pl/",
+    ) -> None:
+        self._text = text
+        self.status = status
+        self.url = url
+
+    async def __aenter__(self) -> "_TextResponse":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def text(self) -> str:
+        return self._text
