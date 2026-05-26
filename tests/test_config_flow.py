@@ -11,7 +11,6 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 from custom_components.startedu.client import CannotConnect, InvalidAuth
 from custom_components.startedu.config_flow import StartEduConfigFlow
-from custom_components.startedu.const import CONF_BASE_URL, DEFAULT_BASE_URL
 
 
 class FakeConfigEntry:
@@ -21,7 +20,6 @@ class FakeConfigEntry:
         self.data = {
             CONF_USERNAME: "family@example.test",
             CONF_PASSWORD: "old-password",
-            CONF_BASE_URL: DEFAULT_BASE_URL,
         }
 
 
@@ -49,6 +47,15 @@ class FakeConfigEntries:
 
 
 class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_user_step_form_hides_startedu_url(self) -> None:
+        flow = StartEduConfigFlow()
+
+        result = await flow.async_step_user()
+
+        self.assertEqual(result["type"], "form")
+        schema = result["data_schema"].schema
+        self.assertEqual(set(schema), {CONF_USERNAME, CONF_PASSWORD})
+
     async def test_user_step_success_creates_entry(self) -> None:
         flow = StartEduConfigFlow()
         validated: list[dict[str, object]] = []
@@ -62,13 +69,13 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
             {
                 CONF_USERNAME: " Family@Example.Test ",
                 CONF_PASSWORD: "secret",
-                CONF_BASE_URL: DEFAULT_BASE_URL,
             }
         )
 
         self.assertEqual(result["type"], "create_entry")
         self.assertEqual(result["title"], "StartEdu")
         self.assertEqual(result["data"][CONF_USERNAME], "Family@Example.Test")
+        self.assertEqual(set(result["data"]), {CONF_USERNAME, CONF_PASSWORD})
         self.assertEqual(flow.unique_id, "family@example.test")
         self.assertEqual(validated[0][CONF_USERNAME], "Family@Example.Test")
 
@@ -84,7 +91,6 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
             {
                 CONF_USERNAME: "family@example.test",
                 CONF_PASSWORD: "wrong",
-                CONF_BASE_URL: DEFAULT_BASE_URL,
             }
         )
 
@@ -103,7 +109,6 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
             {
                 CONF_USERNAME: "family@example.test",
                 CONF_PASSWORD: "secret",
-                CONF_BASE_URL: DEFAULT_BASE_URL,
             }
         )
 

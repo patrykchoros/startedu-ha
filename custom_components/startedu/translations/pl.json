@@ -6,8 +6,7 @@
         "description": "Podaj dane logowania StartEdu. Będą przechowywane tylko w Home Assistant.",
         "data": {
           "username": "Login, e-mail lub numer ucznia",
-          "password": "Hasło",
-          "base_url": "Adres URL StartEdu"
+          "password": "Hasło"
         }
       },
       "reauth_confirm": {

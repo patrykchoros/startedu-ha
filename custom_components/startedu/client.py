@@ -148,7 +148,7 @@ class StartEduClient:
         username: str,
         password: str,
         *,
-        base_url: str = "https://startedu.pl/",
+        base_url: str = "https://s3.startedu.pl/Home/Client",
     ) -> None:
         self._session = session
         self._username = username
