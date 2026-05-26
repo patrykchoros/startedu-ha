@@ -1,5 +1,117 @@
 {
+  "config": {
+    "step": {
+      "user": {
+        "title": "Połącz StartEdu",
+        "description": "Podaj dane logowania StartEdu. Będą przechowywane tylko w Home Assistant.",
+        "data": {
+          "username": "Login, e-mail lub numer ucznia",
+          "password": "Hasło",
+          "base_url": "Adres URL StartEdu"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie StartEdu",
+        "description": "StartEdu odrzuciło zapisane dane logowania. Podaj aktualne hasło.",
+        "data": {
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się ze StartEdu.",
+      "invalid_auth": "StartEdu odrzuciło dane logowania.",
+      "unknown": "Nieoczekiwany błąd."
+    },
+    "abort": {
+      "already_configured": "To konto StartEdu jest już skonfigurowane.",
+      "reauth_failed": "Nie można znaleźć wpisu StartEdu do ponownego logowania.",
+      "reauth_successful": "Ponowne logowanie StartEdu zakończone powodzeniem."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje StartEdu",
+        "data": {
+          "scan_interval": "Interwał odpytywania w minutach",
+          "breakfast_time": "Godzina śniadania",
+          "lunch_time": "Godzina obiadu",
+          "afternoon_snack_time": "Godzina podwieczorku",
+          "other_meal_time": "Godzina innego posiłku"
+        }
+      }
+    }
+  },
   "event": {
     "cancelled_meal_prefix": "ODWOŁANE"
+  },
+  "entity": {
+    "calendar": {
+      "meals": {
+        "name": "Posiłki"
+      }
+    },
+    "sensor": {
+      "next_meal": {
+        "name": "Następny posiłek"
+      },
+      "today_menu": {
+        "name": "Dzisiejsze menu"
+      },
+      "tomorrow_menu": {
+        "name": "Jutrzejsze menu"
+      },
+      "today_meal_status": {
+        "name": "Status dzisiejszego posiłku"
+      },
+      "tomorrow_meal_status": {
+        "name": "Status jutrzejszego posiłku"
+      },
+      "balance": {
+        "name": "Saldo"
+      },
+      "refunds": {
+        "name": "Zwroty"
+      },
+      "last_successful_update": {
+        "name": "Ostatnia udana aktualizacja"
+      },
+      "sync_status": {
+        "name": "Status synchronizacji"
+      },
+      "current_month_order_status": {
+        "name": "Status zamówienia na bieżący miesiąc"
+      },
+      "next_month_order_status": {
+        "name": "Status zamówienia na następny miesiąc"
+      },
+      "refund_available": {
+        "name": "Dostępny zwrot"
+      },
+      "unpaid_amount": {
+        "name": "Kwota do zapłaty"
+      },
+      "next_order_opening_date": {
+        "name": "Data otwarcia kolejnego zamówienia"
+      }
+    },
+    "binary_sensor": {
+      "has_food_today": {
+        "name": "Ma posiłek dzisiaj"
+      },
+      "has_food_tomorrow": {
+        "name": "Ma posiłek jutro"
+      },
+      "can_cancel_today_meal": {
+        "name": "Można odwołać dzisiejszy posiłek"
+      },
+      "can_cancel_tomorrow_meal": {
+        "name": "Można odwołać jutrzejszy posiłek"
+      },
+      "next_month_ordering_available": {
+        "name": "Zamawianie na następny miesiąc dostępne"
+      }
+    }
   }
 }
