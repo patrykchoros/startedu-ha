@@ -34,8 +34,11 @@
 
 ## Milestone 5: Meal Cancellation Implementation
 
-- Implement `startedu.cancel_meal` as an explicit service call.
+- Implement `startedu.cancel_meal` as an explicit service call. Completed in
+  issue #15.
 - Revalidate child, order, date, and cancellation availability immediately
-  before sending the request.
-- Refresh StartEdu data immediately after successful cancellation.
-- Keep cancellation buttons out of the first mutating implementation.
+  before sending the request. Completed in issue #15.
+- Refresh StartEdu data immediately after successful cancellation. Completed in
+  issue #15.
+- Keep cancellation buttons out of the first mutating implementation. Completed
+  in issue #15.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -56,6 +56,21 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
         self.update_interval = timedelta(
             minutes=scan_interval_minutes(self.entry.options)
         )
+
+    async def async_cancel_meal(
+        self,
+        child_id: str,
+        target_date: date,
+    ) -> StartEduAccountData:
+        """Cancel one StartEdu meal day and publish the confirmed fresh data."""
+        data = await self.client.async_cancel_meal(child_id, target_date)
+        self._schedule_next_order_opening_refresh(data)
+        if hasattr(self, "async_set_updated_data"):
+            self.async_set_updated_data(data)
+        else:
+            self.data = data
+            self.async_update_listeners()
+        return data
 
     @callback
     def cancel_scheduled_refreshes(self) -> None:

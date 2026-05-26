@@ -201,8 +201,8 @@ Postconditions after refreshing `/Order/Show/<ORDER_ID>`:
 
 ## Cancellation Failure Modes and Safety Rules
 
-Future implementation must treat cancellation as unsafe unless all preconditions
-are freshly verified immediately before the POST:
+The Home Assistant `startedu.cancel_meal` service treats cancellation as unsafe
+unless all preconditions are freshly verified immediately before the POST:
 
 - The selected child is active or the request has switched to that child and
   reloaded the target order.
@@ -212,7 +212,7 @@ are freshly verified immediately before the POST:
 - `data-action="cancel-meal"` is present.
 - The day has at least one non-cancelled meal slot.
 
-The implementation must surface these failure states without attempting the
+The implementation surfaces these failure states without attempting the
 mutation:
 
 - Missing target child, order, or day block.
@@ -224,5 +224,6 @@ mutation:
 - AJAX response was not JSON, omitted `Status`, or returned `Status: false`.
 - Post-refresh did not show `cancelled` and `Rezygnacja`.
 
-After a successful cancellation, the integration must refresh StartEdu data
-immediately before updating Home Assistant entities.
+After a successful cancellation, the integration refreshes StartEdu data and
+updates Home Assistant entities only after the post-refresh state confirms the
+cancelled day.

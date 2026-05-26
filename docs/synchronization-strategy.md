@@ -13,7 +13,7 @@ The coordinator refreshes StartEdu data:
 - on the configured polling interval, defaulting to `1440` minutes;
 - at the local month boundary;
 - on the next future `next_order_opening_date` exposed by StartEdu;
-- after a future successful mutating action, such as meal cancellation.
+- after a successful mutating action, such as meal cancellation.
 
 The configurable polling interval is clamped between `60` and `1440` minutes.
 This keeps advanced users in control while discouraging excessive StartEdu
