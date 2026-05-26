@@ -7,7 +7,7 @@ This repository is currently in early MVP development. The first milestone is a
 read-mostly HACS integration with a meal calendar, diagnostic sensors, and an
 explicit user-triggered meal cancellation service.
 
-## Read-Only Entities
+## Features
 
 - `calendar.<child>_meals` for upcoming ordered and cancelled meals.
 - `sensor.<child>_next_meal` with structured meal attributes.
@@ -20,19 +20,45 @@ explicit user-triggered meal cancellation service.
 
 ## Installation
 
-This integration is not released yet. During development, copy
-`custom_components/startedu` into your Home Assistant `custom_components`
-directory or add this repository as a HACS custom repository after releases are
-available.
+This integration is prepared for installation as a HACS custom repository. It is
+not published as a default HACS repository yet.
+
+### HACS Custom Repository
+
+1. In Home Assistant, open HACS.
+2. Open **Custom repositories**.
+3. Add this repository URL:
+
+   ```text
+   https://github.com/patrykchoros/startedu-ha
+   ```
+
+4. Select **Integration** as the category.
+5. Download **StartEdu** from HACS.
+6. Restart Home Assistant.
+7. Go to **Settings > Devices & services > Add integration** and add
+   **StartEdu**.
+8. Enter StartEdu credentials and adjust options if needed.
+
+### Manual Development Install
+
+1. Copy `custom_components/startedu` into your Home Assistant
+   `custom_components` directory.
+2. Restart Home Assistant.
+3. Add **StartEdu** from **Settings > Devices & services > Add integration**.
 
 ## Development Status
 
-- HACS repository scaffold: in progress.
+- HACS custom repository metadata: ready for custom repository installation.
+- Default HACS repository publication: not requested yet.
 - StartEdu authentication and cancellation discovery: validated with a test
   account.
 - Read-only entity model: implemented for calendar, sensors, binary sensors,
   and manual refresh.
 - Meal cancellation action: implemented as an explicit service call.
+
+Before public distribution, follow the
+[release checklist](docs/release-checklist.md).
 
 ## Security
 

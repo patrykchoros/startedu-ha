@@ -12,6 +12,7 @@ integration.
 - [Home Assistant Entities](Home-Assistant-Entities)
 - [Synchronization Strategy](Synchronization-Strategy)
 - [Security and Credentials](Security-and-Credentials)
+- [Release Checklist](Release-Checklist)
 
 ## Current Focus
 
