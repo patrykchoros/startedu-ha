@@ -62,6 +62,15 @@ POLISH_MONTHS = {
     "listopada": 11,
     "grudnia": 12,
 }
+HTML_REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
+}
 
 
 class StartEduError(Exception):
@@ -258,6 +267,7 @@ class StartEduClient:
     ) -> StartEduAccountData:
         first_dashboard = parse_dashboard_html(dashboard_html)
         children = []
+        skipped_order_pages = 0
         child_links = first_dashboard.child_links or (
             DashboardChildLink(
                 child_id=first_dashboard.active_child_id,
@@ -281,10 +291,15 @@ class StartEduClient:
                 order_id = _extract_order_id_from_path(order_path)
                 order_url = urljoin(self._base_url, order_path)
                 try:
-                    order_html = await self._request_text("get", order_url)
+                    order_html = await self._request_text(
+                        "get",
+                        order_url,
+                        headers={"Referer": urljoin(self._base_url, "/Home/Client")},
+                    )
                 except StartEduHttpError as err:
                     if err.status not in (403, 404):
                         raise
+                    skipped_order_pages += 1
                     _LOGGER.warning(
                         "StartEdu order page diagnostic: skipped_order_page "
                         "status=%s request_url=%s response_url=%s",
@@ -329,6 +344,15 @@ class StartEduClient:
                 )
             )
 
+        if skipped_order_pages:
+            _LOGGER.warning(
+                "StartEdu data diagnostic: partial_data children=%d meals=%d "
+                "skipped_order_pages=%d",
+                len(children),
+                sum(len(child.meals) for child in children),
+                skipped_order_pages,
+            )
+
         return StartEduAccountData(
             fetched_at=fetched_at,
             children=tuple(children),
@@ -346,6 +370,7 @@ class StartEduClient:
 
     async def _request_text(self, method: str, url: str, **kwargs: Any) -> str:
         request = getattr(self._session, method)
+        kwargs = _with_html_headers(kwargs)
         try:
             async with request(url, **kwargs) as response:
                 status = getattr(response, "status", 0)
@@ -469,6 +494,12 @@ def _redact_startedu_path(path: str) -> str:
 
 def normalize_base_url(url: str) -> str:
     return url if url.endswith("/") else f"{url}/"
+
+
+def _with_html_headers(kwargs: dict[str, Any]) -> dict[str, Any]:
+    headers = dict(HTML_REQUEST_HEADERS)
+    headers.update(kwargs.pop("headers", {}) or {})
+    return {**kwargs, "headers": headers}
 
 
 def _metadata_status(metadata: ResponseMetadata | None) -> int | str:
