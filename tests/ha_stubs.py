@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -80,9 +81,11 @@ def install_homeassistant_stubs(
     sensor = _module("homeassistant.components.sensor")
     sensor.SensorDeviceClass = SensorDeviceClass
     sensor.SensorEntity = SensorEntity
+    sensor.SensorEntityDescription = SensorEntityDescription
 
     binary_sensor = _module("homeassistant.components.binary_sensor")
     binary_sensor.BinarySensorEntity = BinarySensorEntity
+    binary_sensor.BinarySensorEntityDescription = BinarySensorEntityDescription
 
     button = _module("homeassistant.components.button")
     button.ButtonEntity = ButtonEntity
@@ -256,8 +259,30 @@ class SensorDeviceClass:
     TIMESTAMP = "timestamp"
 
 
+@dataclass(frozen=True, kw_only=True)
+class SensorEntityDescription:
+    key: str
+    translation_key: str | None = None
+    device_class: str | None = None
+    native_unit_of_measurement: str | None = None
+    suggested_unit_of_measurement: str | None = None
+    entity_category: str | None = None
+    entity_registry_enabled_default: bool = True
+    translation_placeholders: dict[str, str] | None = None
+
+
 class SensorEntity:
     pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class BinarySensorEntityDescription:
+    key: str
+    translation_key: str | None = None
+    device_class: str | None = None
+    entity_category: str | None = None
+    entity_registry_enabled_default: bool = True
+    translation_placeholders: dict[str, str] | None = None
 
 
 class BinarySensorEntity:

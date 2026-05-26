@@ -79,6 +79,12 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
                 for entity in entities
             )
         )
+        self.assertTrue(
+            all(
+                entity.entity_description.entity_registry_enabled_default
+                for entity in entities
+            )
+        )
 
         today_menu = _entity_by_key(entities, "today_menu")
         today_status = _entity_by_key(entities, "today_meal_status")
@@ -107,6 +113,7 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(next_opening.native_value, date(2026, 6, 15))
         self.assertEqual(refund.native_value, Decimal("12.50"))
         self.assertIsNone(unpaid.native_value)
+        self.assertIsNone(refund.entity_description.suggested_unit_of_measurement)
 
         attributes = today_menu.extra_state_attributes
         next_meal_attributes = next_meal.extra_state_attributes
@@ -144,6 +151,15 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
                 entity.entity_description.translation_placeholders is None
                 for entity in entities
             )
+        )
+        self.assertTrue(
+            all(
+                entity.entity_description.entity_registry_enabled_default
+                for entity in entities
+            )
+        )
+        self.assertTrue(
+            all(entity.entity_description.device_class is None for entity in entities)
         )
         self.assertTrue(_entity_by_key(entities, "has_food_today").is_on)
         self.assertFalse(_entity_by_key(entities, "has_food_tomorrow").is_on)

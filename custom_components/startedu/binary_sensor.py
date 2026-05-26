@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Callable
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,12 +20,9 @@ from .entity_model import can_cancel, has_food
 from .models import StartEduChild
 
 
-@dataclass(frozen=True, slots=True)
-class StartEduBinarySensorDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class StartEduBinarySensorDescription(BinarySensorEntityDescription):
     value_fn: Callable[[StartEduChild, StartEduDataUpdateCoordinator], bool | None]
-    translation_placeholders: Mapping[str, str] | None = None
 
 
 def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:

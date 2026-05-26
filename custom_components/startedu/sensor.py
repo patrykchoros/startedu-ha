@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Callable
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -27,19 +30,13 @@ from .entity_model import (
 from .models import StartEduChild
 
 
-@dataclass(frozen=True, slots=True)
-class StartEduSensorDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class StartEduSensorDescription(SensorEntityDescription):
     value_fn: Callable[[StartEduChild, StartEduDataUpdateCoordinator], Any]
     attributes_fn: (
         Callable[[StartEduChild, StartEduDataUpdateCoordinator], dict[str, Any]]
         | None
     ) = None
-    device_class: SensorDeviceClass | None = None
-    native_unit_of_measurement: str | None = None
-    entity_category: EntityCategory | None = None
-    translation_placeholders: Mapping[str, str] | None = None
 
 
 def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:
