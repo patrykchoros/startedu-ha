@@ -15,11 +15,13 @@ python -m pytest
 
 ## Home Assistant Manual Test
 
-1. Copy `custom_components/startedu` into a Home Assistant development config.
+1. Add this repository as a HACS custom repository with category
+   **Integration**, or copy `custom_components/startedu` into a Home Assistant
+   development config.
 2. Restart Home Assistant.
 3. Add the StartEdu integration from the UI.
-4. Confirm the calendar and sensors are created.
+4. Confirm the calendar, sensors, refresh button, and `startedu.cancel_meal`
+   service are available.
 
 Never store real credentials, cookies, or captured authenticated pages in this
 repository.
-

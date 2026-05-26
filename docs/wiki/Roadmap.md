@@ -3,8 +3,10 @@
 ## Milestone 1: Repository and HACS Scaffold
 
 - Create the private GitHub repository.
-- Add the HACS metadata and custom integration structure.
+- Add the HACS metadata and custom integration structure. Completed in issue #5.
 - Add CI checks for parser tests and static syntax validation.
+- Document HACS custom repository installation and the release checklist.
+  Completed in issue #5.
 
 ## Milestone 2: StartEdu Read-Only Data
 
