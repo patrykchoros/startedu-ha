@@ -28,7 +28,9 @@ from custom_components.startedu.client import (
 
 class StartEduClientParserTests(unittest.TestCase):
     def test_parse_account_html_fixture(self) -> None:
-        html = Path("tests/fixtures/startedu_dashboard.html").read_text(encoding="utf-8")
+        html = Path("tests/fixtures/startedu_dashboard.html").read_text(
+            encoding="utf-8"
+        )
         data = parse_account_html(html, datetime(2026, 5, 25, tzinfo=timezone.utc))
 
         self.assertEqual(data.balance, Decimal("123.45"))
@@ -46,7 +48,11 @@ class StartEduClientParserTests(unittest.TestCase):
         html = """
         <form action="/login" method="post">
           <input type="hidden" name="csrf" value="token">
-          <input type="text" name="Login" placeholder="E-mail, login, or student number">
+          <input
+            type="text"
+            name="Login"
+            placeholder="E-mail, login, or student number"
+          >
           <input type="password" name="Password">
         </form>
         """
@@ -60,9 +66,9 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertEqual(form.password_field, "Password")
 
     def test_parse_dashboard_html_extracts_child_and_order_state(self) -> None:
-        html = Path("tests/fixtures/startedu_client_dashboard_sanitized.html").read_text(
-            encoding="utf-8"
-        )
+        html = Path(
+            "tests/fixtures/startedu_client_dashboard_sanitized.html"
+        ).read_text(encoding="utf-8")
 
         dashboard = parse_dashboard_html(html)
 
@@ -79,7 +85,13 @@ class StartEduClientParserTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        meals = parse_order_html(html, "CLIENT_ID_1", "CHILD_1", "paid")
+        meals = parse_order_html(
+            html,
+            "CLIENT_ID_1",
+            "CHILD_1",
+            "paid",
+            order_id="ORDER_ID",
+        )
 
         self.assertEqual(len(meals), 6)
         self.assertEqual(meals[0].status, "no_school")
@@ -90,6 +102,10 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertEqual(meals[3].status, "cancelled")
         self.assertTrue(meals[4].can_cancel)
         self.assertTrue(meals[5].can_cancel)
+        self.assertEqual(meals[4].raw["order_id"], "ORDER_ID")
+        self.assertEqual(meals[4].raw["day_number"], 26)
+        self.assertTrue(meals[4].raw["can_cancel_action"])
+        self.assertTrue(meals[3].raw["cancel_marker"])
 
     def test_parse_refunds_and_commitments_html(self) -> None:
         refunds_html = Path("tests/fixtures/startedu_refunds_sanitized.html").read_text(

@@ -8,8 +8,8 @@ polling. The default automatic refresh interval is one day.
 The coordinator refreshes StartEdu data when the config entry is set up, on
 Home Assistant startup or reload, after successful reauthentication, on the
 configured polling interval, at the local month boundary, on the next future
-`next_order_opening_date` exposed by StartEdu, and after future successful
-mutating actions such as meal cancellation.
+`next_order_opening_date` exposed by StartEdu, and after successful mutating
+actions such as meal cancellation.
 
 The polling interval is configurable and clamped between `60` and `1440`
 minutes.

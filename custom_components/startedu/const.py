@@ -11,6 +11,12 @@ CONF_LUNCH_TIME = "lunch_time"
 CONF_AFTERNOON_SNACK_TIME = "afternoon_snack_time"
 CONF_OTHER_MEAL_TIME = "other_meal_time"
 
+SERVICE_CANCEL_MEAL = "cancel_meal"
+
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+ATTR_CHILD_ID = "child_id"
+ATTR_DATE = "date"
+
 DEFAULT_BASE_URL = "https://startedu.pl/"
 DEFAULT_SCAN_INTERVAL_MINUTES = 1440
 MIN_SCAN_INTERVAL_MINUTES = 60

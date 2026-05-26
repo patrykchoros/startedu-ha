@@ -4,9 +4,8 @@ StartEdu is a custom Home Assistant integration for exposing meal and account da
 from [startedu.pl](https://startedu.pl/) as Home Assistant entities.
 
 This repository is currently in early MVP development. The first milestone is a
-read-only HACS integration with a meal calendar and diagnostic sensors. Meal
-cancellation is planned after the confirmed StartEdu cancellation flow is turned
-into a safe, user-triggered Home Assistant action.
+read-mostly HACS integration with a meal calendar, diagnostic sensors, and an
+explicit user-triggered meal cancellation service.
 
 ## Read-Only Entities
 
@@ -17,6 +16,7 @@ into a safe, user-triggered Home Assistant action.
   StartEdu exposes those values.
 - Food and cancellation availability binary sensors.
 - `button.<entry>_refresh_startedu_data` for manual user-triggered refresh.
+- `startedu.cancel_meal` service for explicit whole-day cancellation.
 
 ## Installation
 
@@ -32,7 +32,7 @@ available.
   account.
 - Read-only entity model: implemented for calendar, sensors, binary sensors,
   and manual refresh.
-- Meal cancellation action: researched, planned, not implemented.
+- Meal cancellation action: implemented as an explicit service call.
 
 ## Security
 

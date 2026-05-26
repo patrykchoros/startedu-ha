@@ -34,10 +34,12 @@ def install_homeassistant_stubs(
     core = _module("homeassistant.core")
     core.CALLBACK_TYPE = object
     core.HomeAssistant = object
+    core.ServiceCall = ServiceCall
     core.callback = lambda func: func
 
     exceptions = _module("homeassistant.exceptions")
     exceptions.ConfigEntryAuthFailed = ConfigEntryAuthFailed
+    exceptions.HomeAssistantError = HomeAssistantError
 
     helpers = _module("homeassistant.helpers")
     helpers.__path__ = []
@@ -178,6 +180,10 @@ class ConfigEntryAuthFailed(Exception):
     pass
 
 
+class HomeAssistantError(Exception):
+    pass
+
+
 class UpdateFailed(Exception):
     pass
 
@@ -260,6 +266,11 @@ class BinarySensorEntity:
 
 class ButtonEntity:
     pass
+
+
+class ServiceCall:
+    def __init__(self, data: dict[str, Any]) -> None:
+        self.data = data
 
 
 def async_track_point_in_time(hass: Any, action: Any, point_in_time: datetime):

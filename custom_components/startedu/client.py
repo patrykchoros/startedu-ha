@@ -7,12 +7,13 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from .entity_model import meal_type_from_label
 from .models import (
     MEAL_STATUS_CANCELLED,
     MEAL_STATUS_NO_SCHOOL,
+    MEAL_STATUS_NOT_ORDERED,
     MEAL_STATUS_PAID,
     MEAL_STATUS_UNKNOWN,
     MEAL_STATUS_UNPAID,
@@ -70,6 +71,18 @@ class StartEduDataError(StartEduError):
     """Raised when StartEdu returns an unexpected data shape."""
 
 
+class MealCancellationError(StartEduError):
+    """Raised when a StartEdu meal cancellation cannot be completed safely."""
+
+
+class MealCancellationNotAllowed(MealCancellationError):
+    """Raised when local preconditions refuse a cancellation request."""
+
+
+class MealCancellationFailed(MealCancellationError):
+    """Raised when StartEdu rejects or fails to confirm cancellation."""
+
+
 @dataclass(slots=True)
 class LoginForm:
     action: str
@@ -98,6 +111,12 @@ class DashboardSnapshot:
     next_month_order_status: str = MEAL_STATUS_UNKNOWN
     next_month_ordering_available: bool | None = None
     next_order_opening_date: date | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MealCancellationTarget:
+    order_id: str
+    day_number: int
 
 
 class StartEduClient:
@@ -158,6 +177,32 @@ class StartEduClient:
         self._last_html = None
         return account_data
 
+    async def async_cancel_meal(
+        self,
+        child_id: str,
+        target_date: date,
+    ) -> StartEduAccountData:
+        """Cancel one whole-day meal after fresh validation and confirmation."""
+        pre_action_data = await self.async_get_account_data()
+        target = cancellation_target_from_data(
+            pre_action_data,
+            child_id,
+            target_date,
+        )
+
+        response = await self._request_json(
+            "post",
+            self._cancel_meal_url(target.order_id, target.day_number),
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        if response.get("Status") is not True:
+            raise MealCancellationFailed("cancel_request_rejected")
+
+        post_action_data = await self.async_get_account_data()
+        if not cancellation_confirmed(post_action_data, child_id, target_date):
+            raise MealCancellationFailed("cancel_confirmation_failed")
+        return post_action_data
+
     async def _async_parse_full_account_data(
         self,
         dashboard_html: str,
@@ -184,6 +229,7 @@ class StartEduClient:
             child_dashboard = parse_dashboard_html(child_dashboard_html)
             meals = []
             for order_path in child_dashboard.order_paths:
+                order_id = _extract_order_id_from_path(order_path)
                 order_html = await self._request_text(
                     "get",
                     urljoin(self._base_url, order_path),
@@ -194,6 +240,7 @@ class StartEduClient:
                         child_dashboard.active_child_id,
                         child_dashboard.active_child_name,
                         child_dashboard.current_month_order_status,
+                        order_id=order_id,
                     )
                 )
 
@@ -209,7 +256,9 @@ class StartEduClient:
                     child_id=child_dashboard.active_child_id,
                     name=child_dashboard.active_child_name,
                     meals=tuple(meals),
-                    current_month_order_status=child_dashboard.current_month_order_status,
+                    current_month_order_status=(
+                        child_dashboard.current_month_order_status
+                    ),
                     next_month_order_status=child_dashboard.next_month_order_status,
                     next_month_ordering_available=(
                         child_dashboard.next_month_ordering_available
@@ -227,7 +276,11 @@ class StartEduClient:
             active_child_id=first_dashboard.active_child_id,
             meals=tuple(meal for child in children for meal in child.meals),
             refunds=next(
-                (child.refund_available for child in children if child.refund_available),
+                (
+                    child.refund_available
+                    for child in children
+                    if child.refund_available
+                ),
                 None,
             ),
         )
@@ -244,6 +297,39 @@ class StartEduClient:
             raise
         except Exception as err:  # noqa: BLE001 - wrapped for HA config flow errors.
             raise CannotConnect("Could not communicate with StartEdu") from err
+
+    async def _request_json(
+        self,
+        method: str,
+        url: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        request = getattr(self._session, method)
+        try:
+            async with request(url, **kwargs) as response:
+                status = getattr(response, "status", 0)
+                if status >= 400:
+                    raise MealCancellationFailed("cancel_request_http_error")
+                try:
+                    try:
+                        payload = await response.json(content_type=None)
+                    except TypeError:
+                        payload = await response.json()
+                except Exception as err:  # noqa: BLE001 - non-JSON StartEdu response.
+                    raise MealCancellationFailed(
+                        "cancel_request_invalid_response"
+                    ) from err
+                if not isinstance(payload, dict):
+                    raise MealCancellationFailed("cancel_request_invalid_response")
+                return payload
+        except StartEduError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            raise CannotConnect("Could not communicate with StartEdu") from err
+
+    def _cancel_meal_url(self, order_id: str, day_number: int) -> str:
+        query = urlencode({"orderId": order_id, "dayNumber": day_number})
+        return urljoin(self._base_url, f"/Order/CancelMeal?{query}")
 
 
 def extract_login_form(html: str) -> LoginForm:
@@ -350,6 +436,8 @@ def parse_order_html(
     child_id: str = "default",
     child_name: str = "StartEdu",
     default_status: str = MEAL_STATUS_UNKNOWN,
+    *,
+    order_id: str | None = None,
 ) -> tuple[StartEduMeal, ...]:
     order_number = _extract_order_number(html_to_text(html))
     year, month = _extract_order_year_month(html)
@@ -369,8 +457,15 @@ def parse_order_html(
         price = _extract_money_near_label(day_text, ("cena",)) or _extract_first_money(
             day_text
         )
-        can_cancel = 'data-action="cancel-meal"' in block
+        can_cancel = _contains_cancel_meal_action(block)
+        cancel_marker = "rezygnacja" in _strip_accents(day_text).casefold()
         day_status = _status_from_day_block(classes, day_text, default_status)
+        raw = {
+            "order_id": order_id,
+            "day_number": int(day_number),
+            "can_cancel_action": can_cancel,
+            "cancel_marker": cancel_marker,
+        }
 
         if day_status == MEAL_STATUS_NO_SCHOOL:
             meals.append(
@@ -386,6 +481,7 @@ def parse_order_html(
                     order_number=order_number,
                     price=price,
                     can_cancel=False,
+                    raw=raw,
                 )
             )
             continue
@@ -408,9 +504,100 @@ def parse_order_html(
                     order_number=order_number,
                     price=price,
                     can_cancel=can_cancel,
+                    raw=raw,
                 )
             )
     return tuple(meals)
+
+
+def cancellation_target_from_data(
+    data: StartEduAccountData,
+    child_id: str,
+    target_date: date,
+) -> MealCancellationTarget:
+    child = next(
+        (
+            candidate
+            for candidate in data.child_accounts
+            if candidate.child_id == child_id
+        ),
+        None,
+    )
+    if child is None:
+        raise MealCancellationNotAllowed("child_not_found")
+
+    meals = tuple(meal for meal in child.meals if meal.date == target_date)
+    if not meals:
+        raise MealCancellationNotAllowed("day_missing")
+
+    food_meals = tuple(meal for meal in meals if meal.status != MEAL_STATUS_NO_SCHOOL)
+    if not food_meals:
+        raise MealCancellationNotAllowed("day_unavailable")
+
+    if any(meal.is_cancelled for meal in food_meals):
+        raise MealCancellationNotAllowed("already_cancelled")
+
+    if any(meal.status == MEAL_STATUS_NOT_ORDERED for meal in food_meals):
+        raise MealCancellationNotAllowed("not_ordered")
+
+    if not any(_meal_has_cancel_action(meal) for meal in food_meals):
+        raise MealCancellationNotAllowed("missing_cancel_action")
+
+    order_ids = {
+        order_id
+        for meal in food_meals
+        if (order_id := _meal_order_id(meal)) is not None
+    }
+    if not order_ids:
+        raise MealCancellationNotAllowed("order_missing")
+    if len(order_ids) > 1:
+        raise MealCancellationNotAllowed("ambiguous_order")
+
+    day_numbers = {
+        day_number
+        for meal in food_meals
+        if (day_number := _meal_day_number(meal)) is not None
+    }
+    if not day_numbers:
+        raise MealCancellationNotAllowed("day_number_missing")
+    if len(day_numbers) > 1:
+        raise MealCancellationNotAllowed("ambiguous_day")
+
+    return MealCancellationTarget(
+        order_id=order_ids.pop(),
+        day_number=day_numbers.pop(),
+    )
+
+
+def cancellation_confirmed(
+    data: StartEduAccountData,
+    child_id: str,
+    target_date: date,
+) -> bool:
+    child = next(
+        (
+            candidate
+            for candidate in data.child_accounts
+            if candidate.child_id == child_id
+        ),
+        None,
+    )
+    if child is None:
+        return False
+
+    meals = tuple(
+        meal
+        for meal in child.meals
+        if meal.date == target_date and meal.status != MEAL_STATUS_NO_SCHOOL
+    )
+    if not meals:
+        return False
+
+    return (
+        all(meal.is_cancelled for meal in meals)
+        and any(_meal_has_cancel_marker(meal) for meal in meals)
+        and not any(_meal_has_cancel_action(meal) for meal in meals)
+    )
 
 
 def parse_refunds_html(html: str) -> Decimal | None:
@@ -464,7 +651,9 @@ def _parse_meals(rows: list[str]) -> list[StartEduMeal]:
 
         parts = [part.strip() for part in row.split("|") if part.strip()]
         parts_without_date = [
-            part for part in parts if _extract_date(part) is None and not _is_money(part)
+            part
+            for part in parts
+            if _extract_date(part) is None and not _is_money(part)
         ]
         status = _extract_status(row)
         child_name = parts_without_date[0] if len(parts_without_date) >= 2 else None
@@ -559,7 +748,8 @@ def _extract_status(text: str) -> str | None:
     if any(marker in normalized for marker in ("nieoplac", "unpaid")):
         return MEAL_STATUS_UNPAID
     if any(
-        marker in normalized for marker in ("ordered", "active", "zamow", "paid", "oplac")
+        marker in normalized
+        for marker in ("ordered", "active", "zamow", "paid", "oplac")
     ):
         return MEAL_STATUS_PAID
     return None
@@ -570,12 +760,53 @@ def _is_status(text: str) -> bool:
 
 
 def _is_money(text: str) -> bool:
-    return re.fullmatch(rf"\s*{MONEY_RE}\s*", _strip_accents(text), re.IGNORECASE) is not None
+    return (
+        re.fullmatch(rf"\s*{MONEY_RE}\s*", _strip_accents(text), re.IGNORECASE)
+        is not None
+    )
 
 
 def _contains_cancel_action(text: str) -> bool:
     normalized = _strip_accents(text).casefold()
     return "cancel" in normalized or "odwolaj" in normalized
+
+
+def _contains_cancel_meal_action(html: str) -> bool:
+    return bool(
+        re.search(
+            r"data-action\s*=\s*[\"']cancel-meal[\"']",
+            html,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _extract_order_id_from_path(path: str) -> str | None:
+    match = re.search(r"/Order/Show/([^/?#]+)", path, flags=re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def _meal_order_id(meal: StartEduMeal) -> str | None:
+    value = meal.raw.get("order_id")
+    return str(value) if value else None
+
+
+def _meal_day_number(meal: StartEduMeal) -> int | None:
+    value = meal.raw.get("day_number")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _meal_has_cancel_action(meal: StartEduMeal) -> bool:
+    return bool(meal.raw.get("can_cancel_action", meal.can_cancel))
+
+
+def _meal_has_cancel_marker(meal: StartEduMeal) -> bool:
+    return bool(meal.raw.get("cancel_marker"))
 
 
 def _extract_meal_id(text: str) -> str | None:

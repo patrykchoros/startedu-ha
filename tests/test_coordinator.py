@@ -136,9 +136,16 @@ class FakeClient:
         self.result = result
         self.error = error
         self.calls = 0
+        self.cancel_calls = []
 
     async def async_get_account_data(self):
         self.calls += 1
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+    async def async_cancel_meal(self, child_id, target_date):
+        self.cancel_calls.append((child_id, target_date))
         if self.error is not None:
             raise self.error
         return self.result
@@ -277,3 +284,21 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
             MEAL_STATUS_CANCELLED,
         )
         self.assertIs(result.next_meal, active_meal)
+
+    async def test_cancel_meal_updates_coordinator_data_after_success(self) -> None:
+        account_data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 26, tzinfo=timezone.utc),
+            children=(StartEduChild(child_id="CHILD-ID-1", name="Child 1"),),
+        )
+        client = FakeClient(account_data)
+        coordinator = StartEduDataUpdateCoordinator(FakeHass(), client, FakeEntry())
+
+        result = await coordinator.async_cancel_meal(
+            "CHILD-ID-1",
+            date(2026, 5, 26),
+        )
+
+        self.assertIs(result, account_data)
+        self.assertIs(coordinator.data, account_data)
+        self.assertEqual(client.cancel_calls, [("CHILD-ID-1", date(2026, 5, 26))])
+        self.assertEqual(coordinator.listener_updates, 1)

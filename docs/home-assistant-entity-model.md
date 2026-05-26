@@ -2,7 +2,7 @@
 
 This document defines the target entity model for StartEdu. It is based on the
 read-only discovery notes in `docs/startedu-flow-discovery.md` and focuses on
-future Home Assistant usefulness before cancellation actions are implemented.
+Home Assistant usefulness while keeping mutating actions explicit and guarded.
 
 ## Device Model
 
@@ -120,13 +120,12 @@ Assistant local time.
 Unknown StartEdu meal labels use `other_meal_time` and keep the original label
 in attributes.
 
-## Future Cancellation Action
+## Cancellation Service
 
-Whole-day cancellation has been validated through issue #7, but it is not part
-of the MVP read-only integration. The first implementation should be an explicit
-user-triggered Home Assistant service, not an automatic cancellation.
+Whole-day cancellation is exposed only through an explicit user-triggered Home
+Assistant service, not through automatic behavior or entity buttons.
 
-Proposed service:
+Service:
 
 ```text
 startedu.cancel_meal
@@ -142,14 +141,15 @@ Service data:
 
 Execution rules:
 
-- Refresh StartEdu data or refetch the target order immediately before the POST.
+- Refresh StartEdu data and revalidate the target day immediately before the
+  POST.
 - Refuse to call StartEdu unless the target day exposes `can_cancel`.
 - Refuse already-cancelled, unavailable, missing, or not-ordered days.
 - Send exactly one whole-day cancellation request:
   `POST /Order/CancelMeal?orderId=<ORDER_ID>&dayNumber=<DAY>`.
 - Treat success as provisional until a post-action refresh confirms
   `cancelled`, `Rezygnacja`, and no remaining cancel action.
-- Refresh the coordinator immediately after success.
+- Update the coordinator immediately with the confirmed post-action data.
 - Redact credentials, cookies, raw HTML, order IDs, and child IDs from logs and
   diagnostics.
 

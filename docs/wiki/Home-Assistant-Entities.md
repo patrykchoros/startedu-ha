@@ -52,19 +52,19 @@ and next-month data separately.
 Entity names may vary based on Home Assistant's entity registry and translation
 handling.
 
-## Future Cancellation Service
+## Cancellation Service
 
-The proposed first mutating interface is an explicit service call:
+The first mutating interface is an explicit service call:
 
 ```text
 startedu.cancel_meal
 ```
 
-It should target one child and one local date. Before calling StartEdu, the
-integration must refetch the target order and verify that the day still exposes
-`can_cancel`. After a successful `CancelMeal` response, the coordinator should
-refresh immediately and only treat the action as successful when the refreshed
-day is `cancelled`, shows `Rezygnacja`, and no longer exposes the cancel action.
+It targets one child and one local date. Before calling StartEdu, the integration
+refetches the target order and verifies that the day still exposes `can_cancel`.
+After a successful `CancelMeal` response, the coordinator is updated only after
+the refreshed day is `cancelled`, shows `Rezygnacja`, and no longer exposes the
+cancel action.
 
 Entity buttons for today/tomorrow cancellation may be considered after the
 service is proven safe.

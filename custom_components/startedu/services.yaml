@@ -1,0 +1,25 @@
+cancel_meal:
+  name: Cancel meal
+  description: Cancel one whole-day StartEdu meal for a child and local date.
+  fields:
+    config_entry_id:
+      name: Config entry ID
+      description: StartEdu config entry to use for the cancellation request.
+      required: true
+      example: "01HVEXAMPLESTARTEDU"
+      selector:
+        text: {}
+    child_id:
+      name: Child ID
+      description: StartEdu child identifier exposed on the child device.
+      required: true
+      example: "CLIENT_ID_1"
+      selector:
+        text: {}
+    date:
+      name: Date
+      description: Local Home Assistant date of the meal day to cancel.
+      required: true
+      example: "2026-05-26"
+      selector:
+        date: {}
