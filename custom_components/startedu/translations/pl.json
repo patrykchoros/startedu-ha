@@ -112,6 +112,11 @@
       "next_month_ordering_available": {
         "name": "Zamawianie na następny miesiąc dostępne"
       }
+    },
+    "button": {
+      "refresh_startedu_data": {
+        "name": "Odśwież dane StartEdu"
+      }
     }
   }
 }

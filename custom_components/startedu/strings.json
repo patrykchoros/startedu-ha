@@ -112,6 +112,11 @@
       "next_month_ordering_available": {
         "name": "Next month ordering available"
       }
+    },
+    "button": {
+      "refresh_startedu_data": {
+        "name": "Refresh StartEdu data"
+      }
     }
   }
 }

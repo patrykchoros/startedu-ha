@@ -9,6 +9,7 @@ This wiki collects project documentation for the StartEdu Home Assistant HACS in
 - [Development Setup](Development-Setup)
 - [StartEdu Data Model](StartEdu-Data-Model)
 - [Home Assistant Entities](Home-Assistant-Entities)
+- [Synchronization Strategy](Synchronization-Strategy)
 - [Security and Credentials](Security-and-Credentials)
 
 ## Current Focus

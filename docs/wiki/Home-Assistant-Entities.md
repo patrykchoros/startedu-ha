@@ -34,6 +34,14 @@ English.
 - `binary_sensor.<child>_can_cancel_tomorrow_meal`
 - `binary_sensor.<child>_next_month_ordering_available`
 
+## Buttons
+
+- `button.<entry>_refresh_startedu_data`
+
+The refresh button is diagnostic and user-triggered. It requests a full StartEdu
+coordinator refresh for the configured account rather than refreshing current
+and next-month data separately.
+
 Entity names may vary based on Home Assistant's entity registry and translation
 handling.
 
