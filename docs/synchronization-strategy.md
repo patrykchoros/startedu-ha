@@ -3,6 +3,37 @@
 StartEdu meal plans are monthly, so the integration should avoid frequent
 automatic polling. The default automatic refresh interval is one day.
 
+## Refresh Flow
+
+The key rule is that only selected triggers fetch StartEdu again. Daily rollovers
+and meal time changes only recalculate Home Assistant entities from the cached
+StartEdu snapshot.
+
+```mermaid
+flowchart TD
+    setup["Config entry setup\nHA startup or reload"] --> full
+    reauth["Successful reauthentication"] --> full
+    poll["Configured polling interval\n60-1440 minutes"] --> full
+    month["Local month boundary"] --> full
+    opening["next_order_opening_date"] --> full
+    manual["Refresh button"] --> full
+
+    cancel["startedu.cancel_meal"] --> mutation
+    mutation["Mutating StartEdu request\nwith post-refresh confirmation"] --> publish
+
+    full["Full StartEdu refresh"] --> fetch
+    fetch["Fetch account, children,\ncurrent and next-month orders"] --> cache
+    cache["Coordinator cache"] --> publish
+
+    midnight["Local midnight"] --> local
+    options["Meal time or polling\noptions changed"] --> local
+    local["Local recalculation only\nno StartEdu request"] --> notify
+
+    publish["Publish fresh account snapshot"] --> entities
+    notify["Notify entities"] --> entities
+    entities["Calendar, sensors,\nbinary sensors, button state"]
+```
+
 ## Automatic Refresh
 
 The coordinator refreshes StartEdu data:
