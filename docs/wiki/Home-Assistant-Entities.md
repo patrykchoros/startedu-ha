@@ -15,6 +15,7 @@ English.
 
 ## Sensors
 
+- `sensor.<child>_next_meal`
 - `sensor.<child>_today_menu`
 - `sensor.<child>_tomorrow_menu`
 - `sensor.<child>_today_meal_status`
@@ -25,6 +26,12 @@ English.
 - `sensor.<child>_refund_available`
 - `sensor.<child>_unpaid_amount`
 - `sensor.<child>_next_order_opening_date`
+
+`sensor.<child>_next_meal` exposes the next upcoming meal label as state and
+structured attributes for date, meal name, menu, meal type, child display name,
+status, order number, price, cancellation availability, and cancellation state.
+Meal attributes intentionally avoid raw StartEdu HTML, cookies, credentials, and
+internal child/meal identifiers.
 
 ## Binary Sensors
 
