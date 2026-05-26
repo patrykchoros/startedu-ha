@@ -72,6 +72,15 @@ class CannotConnect(StartEduError):
     """Raised when StartEdu cannot be reached or parsed."""
 
 
+class StartEduHttpError(CannotConnect):
+    """Raised when StartEdu responds with an HTTP error."""
+
+    def __init__(self, status: int, url: str) -> None:
+        super().__init__(f"StartEdu returned HTTP {status}")
+        self.status = status
+        self.url = url
+
+
 class InvalidAuth(StartEduError):
     """Raised when credentials are rejected by StartEdu."""
 
@@ -105,6 +114,7 @@ class LoginForm:
 class ResponseMetadata:
     status: int
     url: str
+    raw_url: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,10 +279,20 @@ class StartEduClient:
             meals = []
             for order_path in child_dashboard.order_paths:
                 order_id = _extract_order_id_from_path(order_path)
-                order_html = await self._request_text(
-                    "get",
-                    urljoin(self._base_url, order_path),
-                )
+                order_url = urljoin(self._base_url, order_path)
+                try:
+                    order_html = await self._request_text("get", order_url)
+                except StartEduHttpError as err:
+                    if err.status not in (403, 404):
+                        raise
+                    _LOGGER.warning(
+                        "StartEdu order page diagnostic: skipped_order_page "
+                        "status=%s request_url=%s response_url=%s",
+                        err.status,
+                        safe_url_for_log(order_url),
+                        _metadata_url(self._last_response_metadata),
+                    )
+                    continue
                 meals.extend(
                     parse_order_html(
                         order_html,
@@ -331,9 +351,11 @@ class StartEduClient:
                 status = getattr(response, "status", 0)
                 response_url = getattr(response, "real_url", None)
                 response_url = response_url or getattr(response, "url", url)
+                raw_response_url = str(response_url)
                 self._last_response_metadata = ResponseMetadata(
                     status=status,
-                    url=safe_url_for_log(str(response_url)),
+                    url=safe_url_for_log(raw_response_url),
+                    raw_url=raw_response_url,
                 )
                 if status >= 400:
                     _LOGGER.warning(
@@ -344,7 +366,7 @@ class StartEduClient:
                         status,
                         self._last_response_metadata.url,
                     )
-                    raise CannotConnect(f"StartEdu returned HTTP {status}")
+                    raise StartEduHttpError(status, self._last_response_metadata.url)
                 return await response.text()
         except StartEduError:
             raise
@@ -396,7 +418,7 @@ class StartEduClient:
         if self._last_response_metadata is None:
             return
 
-        response_url = self._last_response_metadata.url
+        response_url = self._last_response_metadata.raw_url
         parsed = urlsplit(response_url)
         if not parsed.scheme or not parsed.netloc:
             return
@@ -423,11 +445,26 @@ def safe_url_for_log(url: str) -> str:
     """Return a URL safe for diagnostics by dropping query and credentials."""
     parsed = urlsplit(url)
     if not parsed.scheme and not parsed.netloc:
-        return parsed.path or "<empty>"
+        return _redact_startedu_path(parsed.path or "<empty>")
 
     netloc = parsed.netloc.rsplit("@", 1)[-1]
-    path = parsed.path or "/"
+    path = _redact_startedu_path(parsed.path or "/")
     return f"{parsed.scheme}://{netloc}{path}"
+
+
+def _redact_startedu_path(path: str) -> str:
+    path = re.sub(
+        r"(/Order/Show/)[^/?#]+",
+        r"\1<redacted>",
+        path,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"(/User/SwitchClient/)[^/?#]+",
+        r"\1<redacted>",
+        path,
+        flags=re.IGNORECASE,
+    )
 
 
 def normalize_base_url(url: str) -> str:

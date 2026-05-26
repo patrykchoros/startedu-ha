@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Callable
@@ -22,6 +23,7 @@ class StartEduBinarySensorDescription:
     key: str
     translation_key: str
     value_fn: Callable[[StartEduChild, StartEduDataUpdateCoordinator], bool | None]
+    translation_placeholders: Mapping[str, str] | None = None
 
 
 def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:

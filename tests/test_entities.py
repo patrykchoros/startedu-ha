@@ -73,6 +73,12 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         await sensor.async_setup_entry(hass, entry, entities.extend)
 
         self.assertEqual(len(entities), len(sensor.SENSOR_DESCRIPTIONS))
+        self.assertTrue(
+            all(
+                entity.entity_description.translation_placeholders is None
+                for entity in entities
+            )
+        )
 
         today_menu = _entity_by_key(entities, "today_menu")
         today_status = _entity_by_key(entities, "today_meal_status")
@@ -133,6 +139,12 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         await binary_sensor.async_setup_entry(hass, entry, entities.extend)
 
         self.assertEqual(len(entities), len(binary_sensor.BINARY_SENSOR_DESCRIPTIONS))
+        self.assertTrue(
+            all(
+                entity.entity_description.translation_placeholders is None
+                for entity in entities
+            )
+        )
         self.assertTrue(_entity_by_key(entities, "has_food_today").is_on)
         self.assertFalse(_entity_by_key(entities, "has_food_tomorrow").is_on)
         self.assertTrue(_entity_by_key(entities, "can_cancel_today_meal").is_on)
