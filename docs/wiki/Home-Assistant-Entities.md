@@ -66,5 +66,6 @@ After a successful `CancelMeal` response, the coordinator is updated only after
 the refreshed day is `cancelled`, shows `Rezygnacja`, and no longer exposes the
 cancel action.
 
-Entity buttons for today/tomorrow cancellation may be considered after the
-service is proven safe.
+Potentially friendlier service targeting is tracked in issue #23. Entity buttons
+for today/tomorrow cancellation should remain out of scope unless a separate
+safety design proves they are appropriate.
