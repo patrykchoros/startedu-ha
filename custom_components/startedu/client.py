@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlsplit
 
 from .entity_model import meal_type_from_label
 from .models import (
@@ -24,7 +24,16 @@ from .models import (
 
 _LOGGER = logging.getLogger(__name__)
 
-LOGIN_FIELD_HINTS = ("login", "email", "e-mail", "user", "student", "uczen")
+LOGIN_FIELD_HINTS = (
+    "login",
+    "email",
+    "e-mail",
+    "user",
+    "student",
+    "uczen",
+    "identifier",
+    "identyfikator",
+)
 PASSWORD_FIELD_HINTS = ("password", "haslo", "passwd")
 MONEY_RE = r"([+-]?\d+(?:[ .]\d{3})*(?:[,.]\d{1,2})?)\s*(?:pln|zl|zloty)"
 DATE_PATTERNS = (
@@ -93,6 +102,12 @@ class LoginForm:
 
 
 @dataclass(frozen=True, slots=True)
+class ResponseMetadata:
+    status: int
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
 class DashboardChildLink:
     child_id: str
     name: str
@@ -141,10 +156,12 @@ class StartEduClient:
         self._base_url = base_url if base_url.endswith("/") else f"{base_url}/"
         self._authenticated = False
         self._last_html: str | None = None
+        self._last_response_metadata: ResponseMetadata | None = None
 
     async def async_login(self) -> None:
         """Authenticate against StartEdu and keep session cookies."""
         login_html = await self._request_text("get", self._base_url)
+        login_page_metadata = self._last_response_metadata
         form = extract_login_form(login_html)
         payload = dict(form.fields)
         payload[form.login_field or "login"] = self._username
@@ -158,6 +175,26 @@ class StartEduClient:
             response_html = await self._request_text(method, login_url, data=payload)
 
         if looks_like_login_page(response_html):
+            response_metadata = self._last_response_metadata
+            _LOGGER.warning(
+                "StartEdu login diagnostic: invalid_auth "
+                "base_url=%s login_page_status=%s login_page_url=%s "
+                "form_method=%s login_field=%s password_field=%s field_count=%d "
+                "request_method=%s request_url=%s response_status=%s "
+                "response_url=%s response_looks_like_login_page=%s",
+                safe_url_for_log(self._base_url),
+                _metadata_status(login_page_metadata),
+                _metadata_url(login_page_metadata),
+                method,
+                form.login_field or "<fallback>",
+                form.password_field or "<fallback>",
+                len(form.fields),
+                method,
+                safe_url_for_log(login_url),
+                _metadata_status(response_metadata),
+                _metadata_url(response_metadata),
+                True,
+            )
             raise InvalidAuth("StartEdu credentials were rejected")
 
         self._authenticated = True
@@ -290,12 +327,33 @@ class StartEduClient:
         try:
             async with request(url, **kwargs) as response:
                 status = getattr(response, "status", 0)
+                response_url = getattr(response, "real_url", None)
+                response_url = response_url or getattr(response, "url", url)
+                self._last_response_metadata = ResponseMetadata(
+                    status=status,
+                    url=safe_url_for_log(str(response_url)),
+                )
                 if status >= 400:
+                    _LOGGER.warning(
+                        "StartEdu request diagnostic: http_error "
+                        "method=%s request_url=%s status=%s response_url=%s",
+                        method.upper(),
+                        safe_url_for_log(url),
+                        status,
+                        self._last_response_metadata.url,
+                    )
                     raise CannotConnect(f"StartEdu returned HTTP {status}")
                 return await response.text()
         except StartEduError:
             raise
         except Exception as err:  # noqa: BLE001 - wrapped for HA config flow errors.
+            _LOGGER.warning(
+                "StartEdu request diagnostic: connection_error "
+                "method=%s request_url=%s error_type=%s",
+                method.upper(),
+                safe_url_for_log(url),
+                type(err).__name__,
+            )
             raise CannotConnect("Could not communicate with StartEdu") from err
 
     async def _request_json(
@@ -344,6 +402,25 @@ def extract_login_form(html: str) -> LoginForm:
         login_field="login",
         password_field="password",
     )
+
+
+def safe_url_for_log(url: str) -> str:
+    """Return a URL safe for diagnostics by dropping query and credentials."""
+    parsed = urlsplit(url)
+    if not parsed.scheme and not parsed.netloc:
+        return parsed.path or "<empty>"
+
+    netloc = parsed.netloc.rsplit("@", 1)[-1]
+    path = parsed.path or "/"
+    return f"{parsed.scheme}://{netloc}{path}"
+
+
+def _metadata_status(metadata: ResponseMetadata | None) -> int | str:
+    return metadata.status if metadata is not None else "<unknown>"
+
+
+def _metadata_url(metadata: ResponseMetadata | None) -> str:
+    return metadata.url if metadata is not None else "<unknown>"
 
 
 def looks_like_login_page(html: str) -> bool:
