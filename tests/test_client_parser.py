@@ -134,6 +134,39 @@ class StartEduClientParserTests(unittest.TestCase):
 
 
 class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_successful_login_adopts_response_shard_host(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(
+                    Path("tests/fixtures/startedu_login_page_sanitized.html").read_text(
+                        encoding="utf-8"
+                    ),
+                    url="https://s3.startedu.pl/Home/Client",
+                )
+            ],
+            post_responses=[
+                _TextResponse(
+                    Path(
+                        "tests/fixtures/startedu_client_dashboard_sanitized.html"
+                    ).read_text(encoding="utf-8"),
+                    url="https://s4.startedu.pl/Home/Client",
+                )
+            ],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s3.startedu.pl/Home/Client",
+        )
+
+        await client.async_login()
+
+        self.assertEqual(
+            client._base_url,
+            "https://s4.startedu.pl/Home/Client/",
+        )
+
     async def test_invalid_login_logs_only_safe_diagnostics(self) -> None:
         session = _LoginSession(
             get_responses=[
