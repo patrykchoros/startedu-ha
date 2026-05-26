@@ -134,6 +134,49 @@ class StartEduClientParserTests(unittest.TestCase):
 
 
 class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_order_http_403_skips_order_page(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(
+                    "",
+                    status=403,
+                    url="https://s1.startedu.pl/Order/Show/SECRET_ORDER",
+                ),
+                _TextResponse("<html></html>", url="https://s1.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s1.startedu.pl/Commitments",
+                ),
+            ],
+            post_responses=[],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s1.startedu.pl/Home/Client",
+        )
+        client._authenticated = True
+        client._last_html = """
+        <html>
+          <body>
+            Subkonto | CHILD_1
+            <a href="/Order/Show/SECRET_ORDER">Wyświetl</a>
+          </body>
+        </html>
+        """
+
+        with self.assertLogs("custom_components.startedu.client", "WARNING") as logs:
+            data = await client.async_get_account_data()
+
+        self.assertEqual(len(data.children), 1)
+        self.assertEqual(data.children[0].meals, ())
+        logged = "\n".join(logs.output)
+        self.assertIn("skipped_order_page", logged)
+        self.assertIn("status=403", logged)
+        self.assertIn("/Order/Show/<redacted>", logged)
+        self.assertNotIn("SECRET_ORDER", logged)
+
     async def test_successful_login_adopts_response_shard_host(self) -> None:
         session = _LoginSession(
             get_responses=[
@@ -217,6 +260,10 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             safe_url_for_log("https://user:pass@example.test/path?token=secret"),
             "https://example.test/path",
+        )
+        self.assertEqual(
+            safe_url_for_log("https://s1.startedu.pl/Order/Show/SECRET?token=secret"),
+            "https://s1.startedu.pl/Order/Show/<redacted>",
         )
 
 

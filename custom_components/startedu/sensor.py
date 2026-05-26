@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -38,6 +39,7 @@ class StartEduSensorDescription:
     device_class: SensorDeviceClass | None = None
     native_unit_of_measurement: str | None = None
     entity_category: EntityCategory | None = None
+    translation_placeholders: Mapping[str, str] | None = None
 
 
 def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:
