@@ -24,9 +24,16 @@ from custom_components.startedu.entity_model import (
     has_food,
     meal_event_description,
     meal_event_summary,
+    meal_public_attributes,
     meal_time_window,
+    next_child_meal,
 )
-from custom_components.startedu.models import StartEduChild, StartEduMeal
+from custom_components.startedu.models import (
+    MEAL_STATUS_CANCELLED,
+    MEAL_STATUS_NO_SCHOOL,
+    StartEduChild,
+    StartEduMeal,
+)
 
 
 class EntityModelTests(unittest.TestCase):
@@ -103,3 +110,83 @@ class EntityModelTests(unittest.TestCase):
         self.assertLessEqual(len(state or ""), 240)
         self.assertIn("full_menu", attributes)
         self.assertEqual(len(attributes["meal_slots"]), 2)
+        self.assertNotIn("meal_id", attributes["meal_slots"][0])
+        self.assertNotIn("child_id", attributes["meal_slots"][0])
+
+    def test_next_meal_prefers_active_meals_and_exposes_public_attributes(self) -> None:
+        cancelled = StartEduMeal(
+            meal_id="internal-meal-id",
+            date=date(2026, 5, 27),
+            name="Obiad",
+            menu="Cancelled.",
+            meal_type="lunch",
+            child_id="internal-child-id",
+            child_name="CHILD_1",
+            status=MEAL_STATUS_CANCELLED,
+            order_number="SE/ORDER_ID/5/2026",
+            price=Decimal("20.50"),
+        )
+        active = StartEduMeal(
+            meal_id="internal-meal-id-2",
+            date=date(2026, 5, 28),
+            name="Obiad",
+            menu="Zupa.",
+            meal_type="lunch",
+            child_id="internal-child-id",
+            child_name="CHILD_1",
+            status="paid",
+            order_number="SE/ORDER_ID/5/2026",
+            price=Decimal("20.50"),
+            can_cancel=True,
+        )
+        child = StartEduChild(
+            child_id="internal-child-id",
+            name="CHILD_1",
+            meals=(cancelled, active),
+        )
+
+        meal = next_child_meal(child, date(2026, 5, 26))
+        attributes = meal_public_attributes(active)
+
+        self.assertIs(meal, active)
+        self.assertEqual(attributes["date"], "2026-05-28")
+        self.assertEqual(attributes["name"], "Obiad")
+        self.assertEqual(attributes["menu"], "Zupa.")
+        self.assertEqual(attributes["meal_type"], "lunch")
+        self.assertEqual(attributes["child"], "CHILD_1")
+        self.assertEqual(attributes["status"], "paid")
+        self.assertEqual(attributes["order_number"], "SE/ORDER_ID/5/2026")
+        self.assertEqual(attributes["price"], "20.50")
+        self.assertTrue(attributes["can_cancel"])
+        self.assertNotIn("meal_id", attributes)
+        self.assertNotIn("child_id", attributes)
+
+    def test_empty_unavailable_and_cancelled_days(self) -> None:
+        no_school_day = date(2026, 5, 27)
+        cancelled_day = date(2026, 5, 28)
+        child = StartEduChild(
+            child_id="CLIENT_ID_1",
+            name="CHILD_1",
+            meals=(
+                StartEduMeal(
+                    meal_id=None,
+                    date=no_school_day,
+                    name="Brak zajęć",
+                    meal_type="other",
+                    status=MEAL_STATUS_NO_SCHOOL,
+                ),
+                StartEduMeal(
+                    meal_id=None,
+                    date=cancelled_day,
+                    name="Obiad",
+                    meal_type="lunch",
+                    status=MEAL_STATUS_CANCELLED,
+                ),
+            ),
+        )
+
+        self.assertIsNone(day_menu_state(child, date(2026, 5, 26)))
+        self.assertEqual(day_status(child, date(2026, 5, 26)), "unknown")
+        self.assertIsNone(day_menu_state(child, no_school_day))
+        self.assertEqual(day_status(child, no_school_day), "no_school")
+        self.assertEqual(day_status(child, cancelled_day), "cancelled")

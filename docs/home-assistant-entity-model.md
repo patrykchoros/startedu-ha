@@ -45,11 +45,16 @@ Each child gets automation-friendly entities.
 
 Menu sensors:
 
+- `sensor.<child>_next_meal`
 - `sensor.<child>_today_menu`
 - `sensor.<child>_tomorrow_menu`
 
-The sensor state is a short menu summary kept below Home Assistant's state
-length limit. Full menu data is exposed in attributes:
+The next meal sensor state is the next upcoming meal label. Its attributes
+include date, meal name, menu when available, meal type, child display name,
+status, order number, price, cancellation availability, and cancellation state.
+
+Today/tomorrow menu sensor state is a short menu summary kept below Home
+Assistant's state length limit. Full menu data is exposed in attributes:
 
 - `full_menu`
 - `meal_slots`
@@ -58,6 +63,9 @@ length limit. Full menu data is exposed in attributes:
 - `order_number`
 - `order_numbers`
 - `is_cancelled`
+
+Meal attributes intentionally do not expose raw StartEdu HTML, cookies,
+credentials, or internal child/meal identifiers.
 
 Binary sensors:
 

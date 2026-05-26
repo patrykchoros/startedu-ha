@@ -8,12 +8,15 @@ read-only HACS integration with a meal calendar and diagnostic sensors. Meal
 cancellation is planned after the confirmed StartEdu cancellation flow is turned
 into a safe, user-triggered Home Assistant action.
 
-## Planned Entities
+## Read-Only Entities
 
-- `calendar.startedu_meals` for upcoming ordered and cancelled meals.
-- A nearest-meal sensor with structured meal attributes.
-- Account balance and refund sensors when StartEdu exposes those values.
-- Sync status and last successful update diagnostic sensors.
+- `calendar.<child>_meals` for upcoming ordered and cancelled meals.
+- `sensor.<child>_next_meal` with structured meal attributes.
+- Today/tomorrow menu and meal status sensors.
+- Refund, unpaid amount, order status, and next-order-opening sensors when
+  StartEdu exposes those values.
+- Food and cancellation availability binary sensors.
+- `button.<entry>_refresh_startedu_data` for manual user-triggered refresh.
 
 ## Installation
 
@@ -27,7 +30,8 @@ available.
 - HACS repository scaffold: in progress.
 - StartEdu authentication and cancellation discovery: validated with a test
   account.
-- Read-only entity model: in progress.
+- Read-only entity model: implemented for calendar, sensors, binary sensors,
+  and manual refresh.
 - Meal cancellation action: researched, planned, not implemented.
 
 ## Security

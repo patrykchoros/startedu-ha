@@ -15,7 +15,14 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .coordinator import StartEduDataUpdateCoordinator
 from .entity import StartEduEntity
-from .entity_model import day_menu_attributes, day_menu_state, day_status
+from .entity_model import (
+    day_menu_attributes,
+    day_menu_state,
+    day_status,
+    meal_event_summary,
+    meal_public_attributes,
+    next_child_meal,
+)
 from .models import StartEduChild
 
 
@@ -63,6 +70,14 @@ def _tomorrow_status_value(
     coordinator: StartEduDataUpdateCoordinator,
 ) -> str:
     return day_status(child, _target_date(coordinator, 1))
+
+
+def _next_meal_value(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> str | None:
+    meal = next_child_meal(child, _target_date(coordinator, 0))
+    return meal_event_summary(meal) if meal else None
 
 
 def _last_successful_update_value(
@@ -121,7 +136,21 @@ def _tomorrow_menu_attributes(
     return day_menu_attributes(child, _target_date(coordinator, 1))
 
 
+def _next_meal_attributes(
+    child: StartEduChild,
+    coordinator: StartEduDataUpdateCoordinator,
+) -> dict[str, Any]:
+    meal = next_child_meal(child, _target_date(coordinator, 0))
+    return meal_public_attributes(meal) if meal else {}
+
+
 SENSOR_DESCRIPTIONS: tuple[StartEduSensorDescription, ...] = (
+    StartEduSensorDescription(
+        key="next_meal",
+        translation_key="next_meal",
+        value_fn=_next_meal_value,
+        attributes_fn=_next_meal_attributes,
+    ),
     StartEduSensorDescription(
         key="today_menu",
         translation_key="today_menu",

@@ -102,6 +102,16 @@ def calendar_meals(child: StartEduChild) -> tuple[StartEduMeal, ...]:
     return tuple(meal for meal in child.meals if meal.status != MEAL_STATUS_NO_SCHOOL)
 
 
+def next_child_meal(child: StartEduChild, today: date) -> StartEduMeal | None:
+    upcoming = [
+        meal
+        for meal in child.meals
+        if meal.date >= today and meal.status != MEAL_STATUS_NO_SCHOOL
+    ]
+    active = [meal for meal in upcoming if not meal.is_cancelled]
+    return min(active or upcoming, key=lambda meal: meal.date, default=None)
+
+
 def meal_event_summary(meal: StartEduMeal, language: str | None = None) -> str:
     if meal.is_cancelled:
         return cancelled_meal_summary(meal.name, language)
@@ -200,8 +210,28 @@ def day_menu_attributes(child: StartEduChild, target_date: date) -> dict[str, An
         "order_number": order_numbers[0] if len(order_numbers) == 1 else None,
         "order_numbers": order_numbers,
         "full_menu": full_menu or None,
-        "meal_slots": [meal.as_attributes() for meal in meals],
+        "meal_slots": [meal_public_attributes(meal) for meal in meals],
     }
+
+
+def meal_public_attributes(meal: StartEduMeal) -> dict[str, Any]:
+    attributes: dict[str, Any] = {
+        "date": meal.date.isoformat(),
+        "name": meal.name,
+        "meal_type": meal.meal_type,
+        "can_cancel": meal.can_cancel,
+        "is_cancelled": meal.is_cancelled,
+        "status": meal.status,
+    }
+    if meal.menu:
+        attributes["menu"] = meal.menu
+    if meal.child_name:
+        attributes["child"] = meal.child_name
+    if meal.order_number:
+        attributes["order_number"] = meal.order_number
+    if meal.price is not None:
+        attributes["price"] = str(meal.price)
+    return attributes
 
 
 def _truncate_state(value: str) -> str:
