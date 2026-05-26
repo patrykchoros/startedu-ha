@@ -67,6 +67,14 @@ Binary sensors:
 - `binary_sensor.<child>_can_cancel_tomorrow_meal`
 - `binary_sensor.<child>_next_month_ordering_available`
 
+Diagnostic button:
+
+- `button.<entry>_refresh_startedu_data`
+
+The refresh button requests a full StartEdu coordinator refresh for the config
+entry. It intentionally does not split current-month and next-month refreshes
+into separate user-facing actions.
+
 Status/accounting sensors:
 
 - `sensor.<child>_today_meal_status`

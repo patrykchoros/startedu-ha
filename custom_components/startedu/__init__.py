@@ -37,5 +37,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is None:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
 
+    coordinator.apply_options()
+    coordinator.async_update_listeners()
