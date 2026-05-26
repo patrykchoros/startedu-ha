@@ -10,7 +10,7 @@
 
 ```bash
 python -m compileall custom_components tests
-python -m pytest
+python -m unittest discover -s tests
 ```
 
 ## Home Assistant Manual Test
