@@ -72,7 +72,6 @@ ignored file such as `.local/startedu-test.env`:
 ```dotenv
 STARTEDU_USERNAME=
 STARTEDU_PASSWORD=
-STARTEDU_BASE_URL=https://s3.startedu.pl/Home/Client
 ```
 
 Keep that file local only. Do not paste its contents into issues, wiki pages,

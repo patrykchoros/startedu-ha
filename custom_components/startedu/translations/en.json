@@ -6,8 +6,7 @@
         "description": "Enter your StartEdu credentials. They are stored only in Home Assistant.",
         "data": {
           "username": "Login, email, or student number",
-          "password": "Password",
-          "base_url": "StartEdu URL"
+          "password": "Password"
         }
       },
       "reauth_confirm": {

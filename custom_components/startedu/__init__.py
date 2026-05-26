@@ -14,7 +14,6 @@ from .const import (
     ATTR_CHILD_ID,
     ATTR_CONFIG_ENTRY_ID,
     ATTR_DATE,
-    CONF_BASE_URL,
     DEFAULT_BASE_URL,
     DOMAIN,
     PLATFORMS,
@@ -38,7 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         session,
         entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
-        base_url=entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
+        base_url=DEFAULT_BASE_URL,
     )
     coordinator = StartEduDataUpdateCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()

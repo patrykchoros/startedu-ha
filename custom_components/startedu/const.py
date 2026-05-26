@@ -4,7 +4,6 @@ from datetime import timedelta
 
 DOMAIN = "startedu"
 
-CONF_BASE_URL = "base_url"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_BREAKFAST_TIME = "breakfast_time"
 CONF_LUNCH_TIME = "lunch_time"
@@ -17,7 +16,7 @@ ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_CHILD_ID = "child_id"
 ATTR_DATE = "date"
 
-DEFAULT_BASE_URL = "https://startedu.pl/"
+DEFAULT_BASE_URL = "https://s3.startedu.pl/Home/Client"
 DEFAULT_SCAN_INTERVAL_MINUTES = 1440
 MIN_SCAN_INTERVAL_MINUTES = 60
 MAX_SCAN_INTERVAL_MINUTES = 1440
