@@ -153,7 +153,7 @@ class StartEduClient:
         self._session = session
         self._username = username
         self._password = password
-        self._base_url = base_url if base_url.endswith("/") else f"{base_url}/"
+        self._base_url = normalize_base_url(base_url)
         self._authenticated = False
         self._last_html: str | None = None
         self._last_response_metadata: ResponseMetadata | None = None
@@ -197,6 +197,7 @@ class StartEduClient:
             )
             raise InvalidAuth("StartEdu credentials were rejected")
 
+        self._adopt_response_base_url()
         self._authenticated = True
         self._last_html = response_html
 
@@ -263,6 +264,7 @@ class StartEduClient:
                     "get",
                     urljoin(self._base_url, child_link.path),
                 )
+                self._adopt_response_base_url()
             child_dashboard = parse_dashboard_html(child_dashboard_html)
             meals = []
             for order_path in child_dashboard.order_paths:
@@ -389,6 +391,19 @@ class StartEduClient:
         query = urlencode({"orderId": order_id, "dayNumber": day_number})
         return urljoin(self._base_url, f"/Order/CancelMeal?{query}")
 
+    def _adopt_response_base_url(self) -> None:
+        """Follow StartEdu's effective shard host after redirects."""
+        if self._last_response_metadata is None:
+            return
+
+        response_url = self._last_response_metadata.url
+        parsed = urlsplit(response_url)
+        if not parsed.scheme or not parsed.netloc:
+            return
+
+        path = parsed.path or "/"
+        self._base_url = normalize_base_url(f"{parsed.scheme}://{parsed.netloc}{path}")
+
 
 def extract_login_form(html: str) -> LoginForm:
     parser = _LoginFormParser()
@@ -413,6 +428,10 @@ def safe_url_for_log(url: str) -> str:
     netloc = parsed.netloc.rsplit("@", 1)[-1]
     path = parsed.path or "/"
     return f"{parsed.scheme}://{netloc}{path}"
+
+
+def normalize_base_url(url: str) -> str:
+    return url if url.endswith("/") else f"{url}/"
 
 
 def _metadata_status(metadata: ResponseMetadata | None) -> int | str:
