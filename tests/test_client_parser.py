@@ -134,6 +134,58 @@ class StartEduClientParserTests(unittest.TestCase):
 
 
 class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_child_switch_refreshes_dashboard_before_order_page(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(_order_html(), url="https://s4.startedu.pl/Order/Show/1"),
+                _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/Commitments",
+                ),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+                ),
+                _TextResponse(
+                    _dashboard_html(active_child=2),
+                    url="https://s4.startedu.pl/Home/Client",
+                ),
+                _TextResponse(_order_html(), url="https://s4.startedu.pl/Order/Show/2"),
+                _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/Commitments",
+                ),
+            ],
+            post_responses=[],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s4.startedu.pl/Home/Client",
+        )
+        client._authenticated = True
+        client._last_html = _dashboard_html(active_child=1)
+
+        data = await client.async_get_account_data()
+
+        self.assertEqual(len(data.children), 2)
+        self.assertEqual(
+            session.get_urls[3],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+        )
+        self.assertEqual(session.get_urls[4], "https://s4.startedu.pl/Home/Client")
+        self.assertEqual(
+            session.get_kwargs[4]["headers"]["Referer"],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+        )
+        self.assertEqual(
+            session.get_kwargs[5]["headers"]["Referer"],
+            "https://s4.startedu.pl/Home/Client",
+        )
+
     async def test_order_http_403_skips_order_page(self) -> None:
         session = _LoginSession(
             get_responses=[
@@ -178,6 +230,8 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("children=1", logged)
         self.assertIn("meals=0", logged)
         self.assertIn("skipped_order_pages=1", logged)
+        self.assertIn("child_meal_counts=0", logged)
+        self.assertIn("meal_dates=<empty>", logged)
         self.assertIn("/Order/Show/<redacted>", logged)
         self.assertNotIn("SECRET_ORDER", logged)
         self.assertEqual(
@@ -285,14 +339,18 @@ class _LoginSession:
     ) -> None:
         self.get_responses = get_responses
         self.post_responses = post_responses
+        self.get_urls: list[str] = []
+        self.post_urls: list[str] = []
         self.get_kwargs: list[dict[str, object]] = []
         self.post_kwargs: list[dict[str, object]] = []
 
     def get(self, url: str, **kwargs: object) -> "_TextResponse":
+        self.get_urls.append(url)
         self.get_kwargs.append(dict(kwargs))
         return self.get_responses.pop(0)
 
     def post(self, url: str, **kwargs: object) -> "_TextResponse":
+        self.post_urls.append(url)
         self.post_kwargs.append(dict(kwargs))
         return self.post_responses.pop(0)
 
@@ -317,3 +375,27 @@ class _TextResponse:
 
     async def text(self) -> str:
         return self._text
+
+
+def _dashboard_html(*, active_child: int) -> str:
+    first_class = "current" if active_child == 1 else ""
+    second_class = "current" if active_child == 2 else ""
+    order_id = f"ORDER_ID_{active_child}"
+    child_name = f"CHILD_{active_child}"
+    return f"""
+    <html>
+      <body>
+        Subkonto | {child_name}
+        <a class="{first_class}" href="/User/SwitchClient/CLIENT_ID_1">CHILD_1</a>
+        <a class="{second_class}" href="/User/SwitchClient/CLIENT_ID_2">CHILD_2</a>
+        <p>Zamówienie SE/{order_id}/5/2026 zostało opłacone.</p>
+        <a href="/Order/Show/{order_id}">Wyświetl</a>
+      </body>
+    </html>
+    """
+
+
+def _order_html() -> str:
+    return Path("tests/fixtures/startedu_order_show_sanitized.html").read_text(
+        encoding="utf-8"
+    )

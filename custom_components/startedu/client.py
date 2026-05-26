@@ -268,6 +268,7 @@ class StartEduClient:
         first_dashboard = parse_dashboard_html(dashboard_html)
         children = []
         skipped_order_pages = 0
+        dashboard_url = urljoin(self._base_url, "/Home/Client")
         child_links = first_dashboard.child_links or (
             DashboardChildLink(
                 child_id=first_dashboard.active_child_id,
@@ -280,11 +281,25 @@ class StartEduClient:
         for child_link in child_links:
             child_dashboard_html = dashboard_html
             if not child_link.is_active and child_link.path:
-                child_dashboard_html = await self._request_text(
+                await self._request_text(
                     "get",
                     urljoin(self._base_url, child_link.path),
+                    headers={"Referer": dashboard_url},
                 )
                 self._adopt_response_base_url()
+                dashboard_url = urljoin(self._base_url, "/Home/Client")
+                child_dashboard_html = await self._request_text(
+                    "get",
+                    dashboard_url,
+                    headers={
+                        "Referer": _metadata_raw_url(
+                            self._last_response_metadata,
+                            dashboard_url,
+                        )
+                    },
+                )
+                self._adopt_response_base_url()
+                dashboard_url = urljoin(self._base_url, "/Home/Client")
             child_dashboard = parse_dashboard_html(child_dashboard_html)
             meals = []
             for order_path in child_dashboard.order_paths:
@@ -347,10 +362,12 @@ class StartEduClient:
         if skipped_order_pages:
             _LOGGER.warning(
                 "StartEdu data diagnostic: partial_data children=%d meals=%d "
-                "skipped_order_pages=%d",
+                "skipped_order_pages=%d child_meal_counts=%s meal_dates=%s",
                 len(children),
                 sum(len(child.meals) for child in children),
                 skipped_order_pages,
+                _child_meal_counts(children),
+                _meal_date_range(children),
             )
 
         return StartEduAccountData(
@@ -508,6 +525,25 @@ def _metadata_status(metadata: ResponseMetadata | None) -> int | str:
 
 def _metadata_url(metadata: ResponseMetadata | None) -> str:
     return metadata.url if metadata is not None else "<unknown>"
+
+
+def _metadata_raw_url(metadata: ResponseMetadata | None, fallback: str) -> str:
+    return metadata.raw_url if metadata is not None else fallback
+
+
+def _child_meal_counts(children: list[StartEduChild]) -> str:
+    return ",".join(str(len(child.meals)) for child in children) or "<empty>"
+
+
+def _meal_date_range(children: list[StartEduChild]) -> str:
+    dates = sorted(
+        meal.date
+        for child in children
+        for meal in child.meals
+    )
+    if not dates:
+        return "<empty>"
+    return f"{dates[0].isoformat()}..{dates[-1].isoformat()}"
 
 
 def looks_like_login_page(html: str) -> bool:
