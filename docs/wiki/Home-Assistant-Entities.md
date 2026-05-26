@@ -3,6 +3,27 @@
 Each StartEdu child is represented as a separate Home Assistant device. See
 `docs/home-assistant-entity-model.md` for the source specification.
 
+## Entity Map
+
+```mermaid
+flowchart TD
+    entry["StartEdu config entry"] --> refresh["Diagnostic refresh button"]
+    entry --> coordinator["Shared coordinator cache"]
+    coordinator --> child["Child device"]
+
+    child --> calendar["Meal calendar"]
+    child --> menu["Menu sensors"]
+    child --> status["Status and accounting sensors"]
+    child --> binary["Food and cancellation binary sensors"]
+
+    calendar --> cal_entity["calendar.<child>_meals"]
+    menu --> next_meal["sensor.<child>_next_meal"]
+    menu --> day_menu["today/tomorrow menu sensors"]
+    status --> order_state["order, refund, unpaid, update sensors"]
+    binary --> food["has_food today/tomorrow"]
+    binary --> can_cancel["can_cancel today/tomorrow"]
+```
+
 ## Calendar
 
 - `calendar.<child>_meals`: meal slots as calendar events.
@@ -65,6 +86,21 @@ refetches the target order and verifies that the day still exposes `can_cancel`.
 After a successful `CancelMeal` response, the coordinator is updated only after
 the refreshed day is `cancelled`, shows `Rezygnacja`, and no longer exposes the
 cancel action.
+
+```mermaid
+flowchart TD
+    service["User calls startedu.cancel_meal"]
+    service --> target["Resolve account,\nchild, and local date"]
+    target --> prefetch["Refresh target order"]
+    prefetch --> decision{"Day can be cancelled?"}
+    decision -- "No" --> refuse["Refuse without\ncalling StartEdu"]
+    decision -- "Yes" --> post["POST CancelMeal\none whole day"]
+    post --> confirm["Refresh and confirm\ncancelled state"]
+    confirm --> ok{"Confirmed?"}
+    ok -- "No" --> error["Raise error and keep\nold coordinator data"]
+    ok -- "Yes" --> cache["Publish confirmed data\nto coordinator cache"]
+    cache --> entities["Entities update from\nconfirmed snapshot"]
+```
 
 Potentially friendlier service targeting is tracked in issue #23. Entity buttons
 for today/tomorrow cancellation should remain out of scope unless a separate

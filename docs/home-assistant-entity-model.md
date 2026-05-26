@@ -15,6 +15,25 @@ Each StartEdu child is represented as a separate Home Assistant device.
 All child-specific entities belong to the child device. This keeps dashboards
 and automations clear for multi-child accounts.
 
+```mermaid
+flowchart TD
+    entry["StartEdu config entry"] --> refresh["Diagnostic refresh button"]
+    entry --> coordinator["Shared coordinator cache"]
+    coordinator --> child["Child device"]
+
+    child --> calendar["Meal calendar"]
+    child --> menu["Menu sensors"]
+    child --> status["Status and accounting sensors"]
+    child --> binary["Food and cancellation binary sensors"]
+
+    calendar --> cal_entity["calendar.<child>_meals"]
+    menu --> next_meal["sensor.<child>_next_meal"]
+    menu --> day_menu["today/tomorrow menu sensors"]
+    status --> order_state["order, refund, unpaid, update sensors"]
+    binary --> food["has_food today/tomorrow"]
+    binary --> can_cancel["can_cancel today/tomorrow"]
+```
+
 ## Calendar
 
 Each child gets one calendar:
@@ -152,6 +171,21 @@ Execution rules:
 - Update the coordinator immediately with the confirmed post-action data.
 - Redact credentials, cookies, raw HTML, order IDs, and child IDs from logs and
   diagnostics.
+
+```mermaid
+flowchart TD
+    service["User calls startedu.cancel_meal"]
+    service --> target["Resolve account,\nchild, and local date"]
+    target --> prefetch["Refresh target order"]
+    prefetch --> decision{"Day can be cancelled?"}
+    decision -- "No" --> refuse["Refuse without\ncalling StartEdu"]
+    decision -- "Yes" --> post["POST CancelMeal\none whole day"]
+    post --> confirm["Refresh and confirm\ncancelled state"]
+    confirm --> ok{"Confirmed?"}
+    ok -- "No" --> error["Raise error and keep\nold coordinator data"]
+    ok -- "Yes" --> cache["Publish confirmed data\nto coordinator cache"]
+    cache --> entities["Entities update from\nconfirmed snapshot"]
+```
 
 Buttons such as `button.<child>_cancel_today_meal` may be considered later, but
 they should not be the first implementation because accidental activation risk
