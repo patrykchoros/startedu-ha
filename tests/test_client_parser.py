@@ -173,9 +173,18 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data.children[0].meals, ())
         logged = "\n".join(logs.output)
         self.assertIn("skipped_order_page", logged)
+        self.assertIn("partial_data", logged)
         self.assertIn("status=403", logged)
+        self.assertIn("children=1", logged)
+        self.assertIn("meals=0", logged)
+        self.assertIn("skipped_order_pages=1", logged)
         self.assertIn("/Order/Show/<redacted>", logged)
         self.assertNotIn("SECRET_ORDER", logged)
+        self.assertEqual(
+            session.get_kwargs[0]["headers"]["Referer"],
+            "https://s1.startedu.pl/Home/Client",
+        )
+        self.assertIn("Mozilla/5.0", session.get_kwargs[0]["headers"]["User-Agent"])
 
     async def test_successful_login_adopts_response_shard_host(self) -> None:
         session = _LoginSession(
@@ -276,11 +285,15 @@ class _LoginSession:
     ) -> None:
         self.get_responses = get_responses
         self.post_responses = post_responses
+        self.get_kwargs: list[dict[str, object]] = []
+        self.post_kwargs: list[dict[str, object]] = []
 
     def get(self, url: str, **kwargs: object) -> "_TextResponse":
+        self.get_kwargs.append(dict(kwargs))
         return self.get_responses.pop(0)
 
     def post(self, url: str, **kwargs: object) -> "_TextResponse":
+        self.post_kwargs.append(dict(kwargs))
         return self.post_responses.pop(0)
 
 
