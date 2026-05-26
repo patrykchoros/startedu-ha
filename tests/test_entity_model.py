@@ -73,7 +73,7 @@ class EntityModelTests(unittest.TestCase):
         self.assertEqual(meal_event_summary(self.child.meals[0]), "Obiad")
         self.assertIn("Rosół", meal_event_description(self.child.meals[0]))
 
-    def test_cancelled_calendar_event_gets_prefix(self) -> None:
+    def test_cancelled_calendar_event_uses_localized_prefix(self) -> None:
         meal = StartEduMeal(
             meal_id="order-18-lunch",
             date=date(2026, 5, 18),
@@ -85,7 +85,11 @@ class EntityModelTests(unittest.TestCase):
             status="cancelled",
         )
 
-        self.assertEqual(meal_event_summary(meal), "ODWOŁANE: Obiad")
+        self.assertEqual(meal_event_summary(meal, "pl"), "ODWOŁANE: Obiad")
+        self.assertEqual(meal_event_summary(meal, "en"), "CANCELLED: Obiad")
+        self.assertEqual(meal_event_summary(meal, "en-US"), "CANCELLED: Obiad")
+        self.assertEqual(meal_event_summary(meal, "de"), "CANCELLED: Obiad")
+        self.assertEqual(meal.summary, "CANCELLED: Obiad - CHILD_1 - cancelled")
 
     def test_day_automation_helpers(self) -> None:
         self.assertTrue(has_food(self.child, self.today))
@@ -99,4 +103,3 @@ class EntityModelTests(unittest.TestCase):
         self.assertLessEqual(len(state or ""), 240)
         self.assertIn("full_menu", attributes)
         self.assertEqual(len(attributes["meal_slots"]), 2)
-

@@ -5,6 +5,8 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from .i18n import cancelled_meal_summary
+
 MEAL_STATUS_NOT_ORDERED = "not_ordered"
 MEAL_STATUS_UNPAID = "unpaid"
 MEAL_STATUS_PAID = "paid"
@@ -46,7 +48,7 @@ class StartEduMeal:
 
     @property
     def summary(self) -> str:
-        parts = [f"ODWOŁANE: {self.name}" if self.is_cancelled else self.name]
+        parts = [cancelled_meal_summary(self.name) if self.is_cancelled else self.name]
         if self.child_name:
             parts.append(self.child_name)
         if self.status != MEAL_STATUS_UNKNOWN:

@@ -28,14 +28,16 @@ Calendar rules:
 - Every meal slot is a separate event.
 - Supported slot types are `breakfast`, `lunch`, `afternoon_snack`, and `other`.
 - Event summary is the meal slot name, such as `Obiad`.
-- Cancelled event summary uses the prefix `ODWOŁANE:`, such as `ODWOŁANE: Obiad`.
+- Cancelled event summary uses a localized prefix while keeping the original
+  StartEdu meal label, such as `CANCELLED: Obiad` in English or
+  `ODWOŁANE: Obiad` in Polish.
 - Event description contains full menu, status, meal type, price, order number,
   child name, and cancellation availability.
 - Event start/end times come from integration options.
 
 Home Assistant `CalendarEvent` does not expose a native cancelled/status field,
-so cancelled meals are represented through the `ODWOŁANE:` title prefix and
-event description.
+so cancelled meals are represented through a localized title prefix and event
+description. Unknown Home Assistant languages fall back to the English prefix.
 
 ## Automation Entities
 
@@ -102,18 +104,39 @@ Assistant local time.
 Unknown StartEdu meal labels use `other_meal_time` and keep the original label
 in attributes.
 
-## Future Cancellation Actions
+## Future Cancellation Action
 
-Cancellation remains blocked by issue #7. The test account must not be used to
-cancel meals.
+Whole-day cancellation has been validated through issue #7, but it is not part
+of the MVP read-only integration. The first implementation should be an explicit
+user-triggered Home Assistant service, not an automatic cancellation.
 
-Planned future actions:
+Proposed service:
 
-- `startedu.cancel_today_meal`
-- `startedu.cancel_tomorrow_meal`
-- `button.<child>_cancel_today_meal`
-- `button.<child>_cancel_tomorrow_meal`
+```text
+startedu.cancel_meal
+```
 
-These should be implemented only after endpoint safety, confirmation behavior,
-failure handling, and child targeting are validated.
+Service data:
 
+- `config_entry_id` or equivalent Home Assistant target for the StartEdu
+  account.
+- `child_id`, using the StartEdu child identifier already attached to the
+  child device.
+- `date`, as a local Home Assistant date.
+
+Execution rules:
+
+- Refresh StartEdu data or refetch the target order immediately before the POST.
+- Refuse to call StartEdu unless the target day exposes `can_cancel`.
+- Refuse already-cancelled, unavailable, missing, or not-ordered days.
+- Send exactly one whole-day cancellation request:
+  `POST /Order/CancelMeal?orderId=<ORDER_ID>&dayNumber=<DAY>`.
+- Treat success as provisional until a post-action refresh confirms
+  `cancelled`, `Rezygnacja`, and no remaining cancel action.
+- Refresh the coordinator immediately after success.
+- Redact credentials, cookies, raw HTML, order IDs, and child IDs from logs and
+  diagnostics.
+
+Buttons such as `button.<child>_cancel_today_meal` may be considered later, but
+they should not be the first implementation because accidental activation risk
+is higher than for an explicit service call.

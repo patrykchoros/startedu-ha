@@ -43,6 +43,9 @@
       }
     }
   },
+  "event": {
+    "cancelled_meal_prefix": "CANCELLED"
+  },
   "entity": {
     "calendar": {
       "meals": {

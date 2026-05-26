@@ -13,4 +13,8 @@ This wiki collects project documentation for the StartEdu Home Assistant HACS in
 
 ## Current Focus
 
-The project is focused on a read-only MVP that exposes StartEdu meal and order data as Home Assistant entities. Mutating actions, including meal cancellation, remain blocked until endpoint safety and failure modes are validated.
+The project is focused on a read-only MVP that exposes StartEdu meal and order
+data as Home Assistant entities. Meal cancellation research has validated the
+StartEdu `CancelMeal` flow, but mutating Home Assistant actions remain deferred
+until they are implemented with explicit user triggering, fresh precondition
+checks, and post-action synchronization.

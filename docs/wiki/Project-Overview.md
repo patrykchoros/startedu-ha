@@ -10,6 +10,7 @@ The MVP is read-only:
   health.
 - A UI config flow for credentials and polling options.
 
-Meal cancellation is intentionally deferred until the authenticated StartEdu
-flow, cutoff rules, and failure modes are documented with a test account.
-
+Meal cancellation research has confirmed the whole-day StartEdu `CancelMeal`
+flow. Implementation remains deferred until it is designed as a safe,
+user-triggered Home Assistant service with fresh precondition checks and
+post-action synchronization.

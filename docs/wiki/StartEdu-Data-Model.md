@@ -31,5 +31,16 @@ The main read-only sources are:
 - `/Refunds` for refund amount and refund transaction history.
 - `/Commitments` for payment obligations and order payment status.
 
-Mutating order/cancellation endpoints were identified in JavaScript but must not
-be called during read-only discovery.
+Whole-day cancellation was validated once through the controlled issue #7 test:
+
+```text
+POST /Order/CancelMeal?orderId=<ORDER_ID>&dayNumber=<DAY>
+```
+
+The successful response shape was JSON with `Status: true`. A refreshed order
+page then showed the day as `cancelled`, displayed `Rezygnacja`, and no longer
+exposed `data-action="cancel-meal"`.
+
+Other mutating endpoints, including `RevertMeal`, `CancelSingleDishType`,
+`Resign`, and order editing endpoints, remain untested and must not be called
+outside a separately approved test plan.

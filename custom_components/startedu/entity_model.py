@@ -19,6 +19,7 @@ from .const import (
     DEFAULT_OTHER_MEAL_DURATION_MINUTES,
     DEFAULT_OTHER_MEAL_TIME,
 )
+from .i18n import cancelled_meal_summary
 from .models import (
     MEAL_STATUS_CANCELLED,
     MEAL_STATUS_NO_SCHOOL,
@@ -101,9 +102,9 @@ def calendar_meals(child: StartEduChild) -> tuple[StartEduMeal, ...]:
     return tuple(meal for meal in child.meals if meal.status != MEAL_STATUS_NO_SCHOOL)
 
 
-def meal_event_summary(meal: StartEduMeal) -> str:
+def meal_event_summary(meal: StartEduMeal, language: str | None = None) -> str:
     if meal.is_cancelled:
-        return f"ODWOŁANE: {meal.name}"
+        return cancelled_meal_summary(meal.name, language)
     return meal.name
 
 

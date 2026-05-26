@@ -51,7 +51,11 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
         meal = self._child.next_meal
         if meal is None:
             return None
-        return _meal_to_event(meal, self.coordinator.entry.options)
+        return _meal_to_event(
+            meal,
+            self.coordinator.entry.options,
+            _hass_language(getattr(self, "hass", None)),
+        )
 
     async def async_get_events(
         self,
@@ -64,17 +68,22 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
 
         start = _as_datetime(start_date)
         end = _as_datetime(end_date)
+        language = _hass_language(hass)
         return [
-            _meal_to_event(meal, self.coordinator.entry.options)
+            _meal_to_event(meal, self.coordinator.entry.options, language)
             for meal in calendar_meals(self._child)
             if start <= meal_time_window(meal, self.coordinator.entry.options).start < end
         ]
 
 
-def _meal_to_event(meal: StartEduMeal, options: dict[str, object]) -> CalendarEvent:
+def _meal_to_event(
+    meal: StartEduMeal,
+    options: dict[str, object],
+    language: str | None = None,
+) -> CalendarEvent:
     window = meal_time_window(meal, options)
     return CalendarEvent(
-        summary=meal_event_summary(meal),
+        summary=meal_event_summary(meal, language),
         start=window.start,
         end=window.end,
         description=meal_event_description(meal),
@@ -85,3 +94,9 @@ def _as_datetime(value: date | datetime) -> datetime:
     if isinstance(value, datetime):
         return value
     return datetime.combine(value, datetime.min.time())
+
+
+def _hass_language(hass: HomeAssistant | None) -> str | None:
+    config = getattr(hass, "config", None)
+    language = getattr(config, "language", None)
+    return str(language) if language else None

@@ -5,8 +5,8 @@ from [startedu.pl](https://startedu.pl/) as Home Assistant entities.
 
 This repository is currently in early MVP development. The first milestone is a
 read-only HACS integration with a meal calendar and diagnostic sensors. Meal
-cancellation will be added only after the StartEdu flow and cancellation rules are
-confirmed with a test account.
+cancellation is planned after the confirmed StartEdu cancellation flow is turned
+into a safe, user-triggered Home Assistant action.
 
 ## Planned Entities
 
@@ -25,9 +25,10 @@ available.
 ## Development Status
 
 - HACS repository scaffold: in progress.
-- StartEdu authentication discovery: pending test account validation.
+- StartEdu authentication and cancellation discovery: validated with a test
+  account.
 - Read-only entity model: in progress.
-- Meal cancellation action: planned, not implemented.
+- Meal cancellation action: researched, planned, not implemented.
 
 ## Security
 
@@ -47,7 +48,8 @@ STARTEDU_BASE_URL=https://s3.startedu.pl/Home/Client
 Keep that file local only. Do not paste its contents into issues, wiki pages,
 fixtures, screenshots, or logs.
 
-The shared StartEdu test account is read-only for this project. It may be used
-to inspect account data, child switching, menus, payment status, and page
-structure. Do not use it to place meal orders, cancel meals, or confirm any
-StartEdu modal that would mutate account state.
+The shared StartEdu test account is read-only by default. It may be used to
+inspect account data, child switching, menus, payment status, and page
+structure. Mutating tests require an explicit issue-backed plan and approval
+before execution. Do not use the account to place meal orders or confirm any
+StartEdu modal that would mutate account state outside an approved test plan.

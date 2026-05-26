@@ -7,8 +7,11 @@ Each StartEdu child is represented as a separate Home Assistant device. See
 
 - `calendar.<child>_meals`: meal slots as calendar events.
 
-Cancelled meal events use the `ODWOŁANE:` summary prefix because Home Assistant
-calendar events do not expose a native cancelled/status field.
+Cancelled meal events use a localized summary prefix because Home Assistant
+calendar events do not expose a native cancelled/status field. The original
+StartEdu meal label is kept unchanged, for example `CANCELLED: Obiad` in English
+or `ODWOŁANE: Obiad` in Polish. Unknown Home Assistant languages fall back to
+English.
 
 ## Sensors
 
@@ -33,3 +36,20 @@ calendar events do not expose a native cancelled/status field.
 
 Entity names may vary based on Home Assistant's entity registry and translation
 handling.
+
+## Future Cancellation Service
+
+The proposed first mutating interface is an explicit service call:
+
+```text
+startedu.cancel_meal
+```
+
+It should target one child and one local date. Before calling StartEdu, the
+integration must refetch the target order and verify that the day still exposes
+`can_cancel`. After a successful `CancelMeal` response, the coordinator should
+refresh immediately and only treat the action as successful when the refreshed
+day is `cancelled`, shows `Rezygnacja`, and no longer exposes the cancel action.
+
+Entity buttons for today/tomorrow cancellation may be considered after the
+service is proven safe.

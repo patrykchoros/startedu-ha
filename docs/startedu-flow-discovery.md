@@ -1,11 +1,13 @@
 # StartEdu Login and Data-Fetch Flow
 
 Discovery date: 2026-05-25.
+Controlled cancellation test date: 2026-05-26.
 
 This document records the authenticated read-only flow observed with the shared
-test account. The account is used only for discovery. Do not place orders,
-cancel meals, revert cancellations, or confirm any modal that mutates StartEdu
-state.
+test account, plus one explicitly approved cancellation test. The account is
+read-only by default. Do not place orders, cancel meals, revert cancellations,
+or confirm any modal that mutates StartEdu state unless a separate issue-backed
+test plan has been approved for that exact action.
 
 ## Login Flow
 
@@ -123,10 +125,9 @@ an explicit flag derived from the action/button, not only from the day class.
 - Remaining amount due.
 - Links to `Order/Show` and `Order/Print`.
 
-## Mutating Endpoints Discovered but Not Called
+## Cancellation Flow
 
-These endpoints were discovered by reading JavaScript only. They must not be
-called while using the shared test account:
+These endpoints were discovered in the monthly order page JavaScript:
 
 ```text
 POST /Order/CancelMeal?orderId=<ORDER_ID>&dayNumber=<DAY>
@@ -136,12 +137,92 @@ POST /Order/Resign?orderId=<ORDER_ID>&dayNumber=<DAY>
 POST <order edit form action>
 ```
 
-The visible cancellation confirmation text is:
+Only `CancelMeal` has been validated with a controlled test. `RevertMeal`,
+`CancelSingleDishType`, `Resign`, and order edit endpoints were not called.
+
+The whole-day cancellation UI is exposed by:
+
+```html
+<a data-action="cancel-meal" href="#">Odwołaj posiłek</a>
+```
+
+The page JavaScript sends:
+
+```text
+POST /Order/CancelMeal?orderId=<ORDER_ID>&dayNumber=<DAY>
+X-Requested-With: XMLHttpRequest
+```
+
+The successful AJAX response observed during the controlled test was sanitized
+to:
+
+```json
+{"Status": true}
+```
+
+The visible cancellation confirmation text in the web UI is:
 
 ```text
 Nie będzie można cofnąć tej czynności. Czy na pewno chcesz dokonać rezygnacji z posiłku?
 ```
 
-Future cancellation work must use a separate safety plan and must not reuse this
-read-only discovery account for actual cancellations.
+The confirmation may be bypassed when calling the AJAX endpoint directly, so any
+Home Assistant action must provide its own explicit user confirmation or be
+implemented only as a deliberate service call with clear documentation.
 
+No explicit cancellation cutoff timestamp was observed in the tested HTML.
+Availability appears as a permission/affordance on each day: if
+`data-action="cancel-meal"` is absent, the integration must treat the cutoff or
+permission window as closed and must not call `CancelMeal`.
+
+## Controlled Cancellation Test
+
+On 2026-05-26 at 08:18 Europe/Warsaw, a test account child and May 2026 order
+were used to validate whole-day cancellation. The issue comment for
+`patrykchoros/startedu-ha#7` contains the sanitized evidence.
+
+Preconditions for both 2026-05-26 and 2026-05-27:
+
+- Day block existed in `/Order/Show/<ORDER_ID>`.
+- Day class was `green`.
+- `data-action="cancel-meal"` was present.
+- `Rezygnacja` marker was absent.
+- Meal labels were `Obiad` and `Podwieczorek`.
+
+For each day, exactly one `CancelMeal` request was sent. Both requests returned
+HTTP 200 and JSON `Status: true`.
+
+Postconditions after refreshing `/Order/Show/<ORDER_ID>`:
+
+- Day class became `cancelled`.
+- `Rezygnacja` marker was present.
+- `data-action="cancel-meal"` was absent.
+- The cancellation applied to the full daily meal set, not an individual dish.
+
+## Cancellation Failure Modes and Safety Rules
+
+Future implementation must treat cancellation as unsafe unless all preconditions
+are freshly verified immediately before the POST:
+
+- The selected child is active or the request has switched to that child and
+  reloaded the target order.
+- The target date belongs to the visible order month.
+- The day block exists and is not already `cancelled`.
+- The day is not marked unavailable, disabled, or `Dzień niedostępny`.
+- `data-action="cancel-meal"` is present.
+- The day has at least one non-cancelled meal slot.
+
+The implementation must surface these failure states without attempting the
+mutation:
+
+- Missing target child, order, or day block.
+- Missing cancellation action.
+- Day already cancelled.
+- Day unavailable or not ordered.
+- Session expired or authentication failed.
+- StartEdu returned HTTP 4xx/5xx.
+- AJAX response was not JSON, omitted `Status`, or returned `Status: false`.
+- Post-refresh did not show `cancelled` and `Rezygnacja`.
+
+After a successful cancellation, the integration must refresh StartEdu data
+immediately before updating Home Assistant entities.
