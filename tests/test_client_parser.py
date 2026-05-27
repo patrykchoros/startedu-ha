@@ -121,6 +121,35 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertTrue(meals[4].raw["can_cancel_action"])
         self.assertTrue(meals[3].raw["cancel_marker"])
 
+    def test_parse_order_html_accepts_day_attributes_in_any_order(self) -> None:
+        html = """
+        <html>
+          <body>
+            <h1>Zamówienie nr SE/ORDER_ID/5/2026 na maj 2026</h1>
+            <div data-number='27' class='day green'>
+              <h3>Obiad</h3>
+              <p>Makaron.</p>
+              <a data-action='cancel-meal' href='#'>Odwołaj posiłek</a>
+            </div>
+            <div data-number=28 class="day cancelled">
+              <div>Rezygnacja</div>
+              <h3>Podwieczorek</h3>
+              <p>Owoc.</p>
+            </div>
+          </body>
+        </html>
+        """
+
+        meals = parse_order_html(html, "CLIENT_ID_1", "CHILD_1", "paid")
+
+        self.assertEqual([meal.date.isoformat() for meal in meals], [
+            "2026-05-27",
+            "2026-05-28",
+        ])
+        self.assertEqual(meals[0].name, "Obiad")
+        self.assertTrue(meals[0].can_cancel)
+        self.assertEqual(meals[1].status, "cancelled")
+
     def test_parse_refunds_and_commitments_html(self) -> None:
         refunds_html = Path("tests/fixtures/startedu_refunds_sanitized.html").read_text(
             encoding="utf-8"
