@@ -10,7 +10,6 @@ explicit user-triggered meal cancellation service.
 ## Features
 
 - `calendar.<child>_meals` for upcoming ordered and cancelled meals.
-- `sensor.<child>_next_meal` with structured meal attributes.
 - Today/tomorrow menu and meal status sensors.
 - Refund, unpaid amount, order status, and next-order-opening sensors when
   StartEdu exposes those values.

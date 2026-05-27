@@ -17,6 +17,8 @@ from .models import (
     MEAL_STATUS_PAID,
     MEAL_STATUS_UNKNOWN,
     MEAL_STATUS_UNPAID,
+    ORDER_STATUS_AVAILABLE,
+    ORDER_STATUS_BLOCKED,
     StartEduAccountData,
     StartEduChild,
     StartEduMeal,
@@ -608,15 +610,12 @@ def parse_dashboard_html(html: str) -> DashboardSnapshot:
     next_available = None
     next_status = MEAL_STATUS_UNKNOWN
     normalized_text = _strip_accents(text).casefold()
-    if (
-        "tworzenie zamowien" in normalized_text
-        and "nie jest jeszcze mozliwe" in normalized_text
-    ):
+    if _next_month_ordering_blocked(normalized_text):
         next_available = False
-        next_status = "not_available"
-    elif "mozliwe" in normalized_text and "nadchodzacy miesiac" in normalized_text:
+        next_status = ORDER_STATUS_BLOCKED
+    elif _next_month_ordering_available(normalized_text):
         next_available = True
-        next_status = "available"
+        next_status = ORDER_STATUS_AVAILABLE
     opening_date = (
         _extract_next_order_opening_date(text, normalized_text)
         if next_available is False
@@ -706,6 +705,28 @@ def parse_order_html(
                 )
             )
     return tuple(meals)
+
+
+def _next_month_ordering_blocked(normalized_text: str) -> bool:
+    return (
+        "tworzenie zamowien" in normalized_text
+        and "nie jest jeszcze mozliwe" in normalized_text
+    )
+
+
+def _next_month_ordering_available(normalized_text: str) -> bool:
+    return any(
+        marker in normalized_text
+        for marker in (
+            "zamowienie na nadchodzacy miesiac",
+            "zamowienia na nadchodzacy miesiac",
+            "tworzenie zamowien na nadchodzacy miesiac",
+            "utworz zamowienie",
+            "zloz zamowienie",
+            "zlozyc zamowienie",
+            "dodaj zamowienie",
+        )
+    ) and "nie jest jeszcze mozliwe" not in normalized_text
 
 
 def cancellation_target_from_data(

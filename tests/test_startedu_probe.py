@@ -106,14 +106,14 @@ class StartEduProbeTests(unittest.TestCase):
         serialized = json.dumps(report, ensure_ascii=False)
         child = report["children"][0]
 
-        self.assertEqual(report["expected_entities"]["per_child"], 17)
+        self.assertEqual(report["expected_entities"]["per_child"], 16)
         self.assertEqual(report["expected_entities"]["account"], 1)
-        self.assertEqual(child["entity_count"], 17)
+        self.assertEqual(child["entity_count"], 16)
         self.assertTrue(child["sensors"]["today_menu"]["state_present"])
         self.assertEqual(child["sensors"]["today_menu"]["meal_slots"], 1)
         self.assertTrue(child["binary_sensors"]["has_food_today"])
         self.assertEqual(child["calendar"]["meals"]["events"], 1)
-        self.assertIn("expected_entities: account=1 per_child=17", formatted)
+        self.assertIn("expected_entities: account=1 per_child=16", formatted)
 
         for secret in (
             "SECRET_CHILD_ID_1",

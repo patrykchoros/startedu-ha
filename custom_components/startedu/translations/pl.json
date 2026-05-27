@@ -52,9 +52,6 @@
       }
     },
     "sensor": {
-      "next_meal": {
-        "name": "Następny posiłek"
-      },
       "today_menu": {
         "name": "Dzisiejsze menu"
       },

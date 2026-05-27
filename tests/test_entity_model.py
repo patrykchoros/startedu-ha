@@ -27,6 +27,7 @@ from custom_components.startedu.entity_model import (
     meal_public_attributes,
     meal_time_window,
     next_child_meal,
+    normalize_menu_text,
 )
 from custom_components.startedu.models import (
     MEAL_STATUS_CANCELLED,
@@ -47,7 +48,7 @@ class EntityModelTests(unittest.TestCase):
                     meal_id="order-26-lunch",
                     date=self.today,
                     name="Obiad",
-                    menu="Rosół. Kotlet. Kompot.",
+                    menu="ROSÓŁ. KOTLET. KOMPOT.",
                     meal_type="lunch",
                     child_id="CLIENT_ID_1",
                     child_name="CHILD_1",
@@ -60,7 +61,7 @@ class EntityModelTests(unittest.TestCase):
                     meal_id="order-26-snack",
                     date=self.today,
                     name="Podwieczorek",
-                    menu="Tapioka.",
+                    menu="tapioka.",
                     meal_type="afternoon_snack",
                     child_id="CLIENT_ID_1",
                     child_name="CHILD_1",
@@ -78,7 +79,24 @@ class EntityModelTests(unittest.TestCase):
         self.assertEqual(window.start.isoformat(), "2026-05-26T12:15:00")
         self.assertEqual(window.end.isoformat(), "2026-05-26T13:00:00")
         self.assertEqual(meal_event_summary(self.child.meals[0]), "Obiad")
-        self.assertIn("Rosół", meal_event_description(self.child.meals[0]))
+        self.assertEqual(
+            meal_event_description(self.child.meals[0]),
+            "Rosół. Kotlet. Kompot.",
+        )
+
+    def test_menu_text_is_normalized_to_natural_casing(self) -> None:
+        self.assertEqual(
+            normalize_menu_text("ZUPA POMIDOROWA. MAKARON Z SEREM."),
+            "Zupa pomidorowa. Makaron z serem.",
+        )
+        self.assertEqual(
+            normalize_menu_text("zupa pomidorowa. makaron z serem."),
+            "Zupa pomidorowa. Makaron z serem.",
+        )
+        self.assertEqual(
+            normalize_menu_text("Ryż BIO z warzywami."),
+            "Ryż BIO z warzywami.",
+        )
 
     def test_cancelled_calendar_event_uses_localized_prefix(self) -> None:
         meal = StartEduMeal(
@@ -103,12 +121,15 @@ class EntityModelTests(unittest.TestCase):
         self.assertTrue(can_cancel(self.child, self.today))
         self.assertEqual(day_status(self.child, self.today), "paid")
 
-        state = day_menu_state(self.child, self.today)
-        attributes = day_menu_attributes(self.child, self.today)
+        state = day_menu_state(self.child, self.today, "pl")
+        attributes = day_menu_attributes(self.child, self.today, "pl")
 
         self.assertIsNotNone(state)
         self.assertLessEqual(len(state or ""), 240)
+        self.assertIn("Rosół. Kotlet. Kompot.", state or "")
         self.assertIn("full_menu", attributes)
+        self.assertEqual(attributes["status"], "opłacone")
+        self.assertEqual(attributes["status_code"], "paid")
         self.assertEqual(len(attributes["meal_slots"]), 2)
         self.assertNotIn("meal_id", attributes["meal_slots"][0])
         self.assertNotIn("child_id", attributes["meal_slots"][0])
@@ -146,7 +167,7 @@ class EntityModelTests(unittest.TestCase):
         )
 
         meal = next_child_meal(child, date(2026, 5, 26))
-        attributes = meal_public_attributes(active)
+        attributes = meal_public_attributes(active, "pl")
 
         self.assertIs(meal, active)
         self.assertEqual(attributes["date"], "2026-05-28")
@@ -154,7 +175,8 @@ class EntityModelTests(unittest.TestCase):
         self.assertEqual(attributes["menu"], "Zupa.")
         self.assertEqual(attributes["meal_type"], "lunch")
         self.assertEqual(attributes["child"], "CHILD_1")
-        self.assertEqual(attributes["status"], "paid")
+        self.assertEqual(attributes["status"], "opłacone")
+        self.assertEqual(attributes["status_code"], "paid")
         self.assertEqual(attributes["order_number"], "SE/ORDER_ID/5/2026")
         self.assertEqual(attributes["price"], "20.50")
         self.assertTrue(attributes["can_cancel"])

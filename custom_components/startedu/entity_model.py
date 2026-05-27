@@ -19,7 +19,7 @@ from .const import (
     DEFAULT_OTHER_MEAL_DURATION_MINUTES,
     DEFAULT_OTHER_MEAL_TIME,
 )
-from .i18n import cancelled_meal_summary
+from .i18n import cancelled_meal_summary, status_label
 from .models import (
     MEAL_STATUS_CANCELLED,
     MEAL_STATUS_NO_SCHOOL,
@@ -118,24 +118,10 @@ def meal_event_summary(meal: StartEduMeal, language: str | None = None) -> str:
     return meal.name
 
 
-def meal_event_description(meal: StartEduMeal) -> str:
-    lines = []
-    if meal.menu:
-        lines.append(meal.menu)
-    lines.extend(
-        [
-            f"Status: {meal.status}",
-            f"Meal type: {meal.meal_type}",
-            f"Can cancel: {meal.can_cancel}",
-        ]
-    )
-    if meal.price is not None:
-        lines.append(f"Price: {meal.price} PLN")
-    if meal.order_number:
-        lines.append(f"Order: {meal.order_number}")
-    if meal.child_name:
-        lines.append(f"Child: {meal.child_name}")
-    return "\n".join(lines)
+def meal_event_description(meal: StartEduMeal) -> str | None:
+    if not meal.menu:
+        return None
+    return normalize_menu_text(meal.menu)
 
 
 def day_meals(child: StartEduChild, target_date: date) -> tuple[StartEduMeal, ...]:
@@ -172,7 +158,11 @@ def day_status(child: StartEduChild, target_date: date) -> str:
     return MEAL_STATUS_UNKNOWN
 
 
-def day_menu_state(child: StartEduChild, target_date: date) -> str | None:
+def day_menu_state(
+    child: StartEduChild,
+    target_date: date,
+    language: str | None = None,
+) -> str | None:
     meals = [
         meal
         for meal in day_meals(child, target_date)
@@ -183,15 +173,19 @@ def day_menu_state(child: StartEduChild, target_date: date) -> str | None:
 
     parts = []
     for meal in meals:
-        label = meal_event_summary(meal)
+        label = meal_event_summary(meal, language)
         if meal.menu:
-            parts.append(f"{label}: {meal.menu}")
+            parts.append(f"{label}: {normalize_menu_text(meal.menu)}")
         else:
             parts.append(label)
     return _truncate_state("; ".join(parts))
 
 
-def day_menu_attributes(child: StartEduChild, target_date: date) -> dict[str, Any]:
+def day_menu_attributes(
+    child: StartEduChild,
+    target_date: date,
+    language: str | None = None,
+) -> dict[str, Any]:
     meals = [
         meal
         for meal in day_meals(child, target_date)
@@ -199,32 +193,38 @@ def day_menu_attributes(child: StartEduChild, target_date: date) -> dict[str, An
     ]
     status = day_status(child, target_date)
     full_menu = "\n\n".join(
-        f"{meal_event_summary(meal)}\n{meal.menu or ''}".strip()
+        f"{meal_event_summary(meal, language)}\n"
+        f"{normalize_menu_text(meal.menu) if meal.menu else ''}".strip()
         for meal in meals
     )
     order_numbers = sorted({meal.order_number for meal in meals if meal.order_number})
     return {
         "date": target_date.isoformat(),
-        "status": status,
+        "status": status_label(status, language),
+        "status_code": status,
         "is_cancelled": status == MEAL_STATUS_CANCELLED,
         "order_number": order_numbers[0] if len(order_numbers) == 1 else None,
         "order_numbers": order_numbers,
         "full_menu": full_menu or None,
-        "meal_slots": [meal_public_attributes(meal) for meal in meals],
+        "meal_slots": [meal_public_attributes(meal, language) for meal in meals],
     }
 
 
-def meal_public_attributes(meal: StartEduMeal) -> dict[str, Any]:
+def meal_public_attributes(
+    meal: StartEduMeal,
+    language: str | None = None,
+) -> dict[str, Any]:
     attributes: dict[str, Any] = {
         "date": meal.date.isoformat(),
         "name": meal.name,
         "meal_type": meal.meal_type,
         "can_cancel": meal.can_cancel,
         "is_cancelled": meal.is_cancelled,
-        "status": meal.status,
+        "status": status_label(meal.status, language),
+        "status_code": meal.status,
     }
     if meal.menu:
-        attributes["menu"] = meal.menu
+        attributes["menu"] = normalize_menu_text(meal.menu)
     if meal.child_name:
         attributes["child"] = meal.child_name
     if meal.order_number:
@@ -238,6 +238,66 @@ def _truncate_state(value: str) -> str:
     if len(value) <= SAFE_MENU_STATE_LENGTH:
         return value
     return f"{value[: SAFE_MENU_STATE_LENGTH - 1].rstrip()}…"
+
+
+def normalize_menu_text(value: str) -> str:
+    compact = re.sub(r"\s+", " ", value).strip()
+    if not compact:
+        return compact
+
+    words = list(re.finditer(r"[^\W\d_]+", compact, flags=re.UNICODE))
+    if not words:
+        return compact
+
+    cased_words = [
+        match.group(0)
+        for match in words
+        if any(char.islower() or char.isupper() for char in match.group(0))
+    ]
+    if not cased_words:
+        return compact
+
+    normalized_words = 0
+    sentence_start = True
+    result = []
+    last_end = 0
+    for index, match in enumerate(words):
+        result.append(compact[last_end : match.start()])
+        word = match.group(0)
+        replacement, changed = _normalize_menu_word(word, sentence_start)
+        result.append(replacement)
+        normalized_words += int(changed)
+        last_end = match.end()
+        next_start = words[index + 1].start() if index + 1 < len(words) else last_end
+        separator = compact[last_end:next_start]
+        if re.search(r"[.!?]\s*$", separator):
+            sentence_start = True
+        else:
+            sentence_start = False
+    result.append(compact[last_end:])
+
+    if normalized_words == 0:
+        return compact
+    return "".join(result)
+
+
+def _normalize_menu_word(word: str, sentence_start: bool) -> tuple[str, bool]:
+    if _is_short_acronym(word):
+        return word, False
+
+    if not (word.isupper() or word.islower()):
+        return word, False
+
+    lowered = word.lower()
+    if sentence_start:
+        replacement = f"{lowered[0].upper()}{lowered[1:]}"
+    else:
+        replacement = lowered
+    return replacement, replacement != word
+
+
+def _is_short_acronym(word: str) -> bool:
+    return word.isupper() and 1 < len(word) <= 3
 
 
 def _strip_accents(value: str) -> str:

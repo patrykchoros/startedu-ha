@@ -13,6 +13,8 @@ MEAL_STATUS_PAID = "paid"
 MEAL_STATUS_CANCELLED = "cancelled"
 MEAL_STATUS_NO_SCHOOL = "no_school"
 MEAL_STATUS_UNKNOWN = "unknown"
+ORDER_STATUS_AVAILABLE = "available"
+ORDER_STATUS_BLOCKED = "blocked"
 
 MEAL_TYPE_BREAKFAST = "breakfast"
 MEAL_TYPE_LUNCH = "lunch"

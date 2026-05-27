@@ -27,7 +27,6 @@ flowchart TD
     child --> binary["Food and cancellation binary sensors"]
 
     calendar --> cal_entity["calendar.<child>_meals"]
-    menu --> next_meal["sensor.<child>_next_meal"]
     menu --> day_menu["today/tomorrow menu sensors"]
     status --> order_state["order, refund, unpaid, update sensors"]
     binary --> food["has_food today/tomorrow"]
@@ -50,13 +49,12 @@ Calendar rules:
 - Cancelled event summary uses a localized prefix while keeping the original
   StartEdu meal label, such as `CANCELLED: Obiad` in English or
   `ODWOŁANE: Obiad` in Polish.
-- Event description contains full menu, status, meal type, price, order number,
-  child name, and cancellation availability.
+- Event description contains only normalized menu text.
 - Event start/end times come from integration options.
 
 Home Assistant `CalendarEvent` does not expose a native cancelled/status field,
-so cancelled meals are represented through a localized title prefix and event
-description. Unknown Home Assistant languages fall back to the English prefix.
+so cancelled meals are represented through a localized title prefix. Unknown
+Home Assistant languages fall back to the English prefix.
 
 ## Automation Entities
 
@@ -64,13 +62,8 @@ Each child gets automation-friendly entities.
 
 Menu sensors:
 
-- `sensor.<child>_next_meal`
 - `sensor.<child>_today_menu`
 - `sensor.<child>_tomorrow_menu`
-
-The next meal sensor state is the next upcoming meal label. Its attributes
-include date, meal name, menu when available, meal type, child display name,
-status, order number, price, cancellation availability, and cancellation state.
 
 Today/tomorrow menu sensor state is a short menu summary kept below Home
 Assistant's state length limit. Full menu data is exposed in attributes:
@@ -79,6 +72,7 @@ Assistant's state length limit. Full menu data is exposed in attributes:
 - `meal_slots`
 - `date`
 - `status`
+- `status_code`
 - `order_number`
 - `order_numbers`
 - `is_cancelled`
@@ -113,7 +107,9 @@ Status/accounting sensors:
 - `sensor.<child>_unpaid_amount`
 - `sensor.<child>_next_order_opening_date`
 
-Meal status states:
+Meal status sensor states are localized to the Home Assistant language. The raw
+stable code remains available as `status_code` in menu attributes. Known meal
+status codes include:
 
 - `not_ordered`
 - `unpaid`
@@ -121,6 +117,13 @@ Meal status states:
 - `cancelled`
 - `no_school`
 - `unknown`
+
+Order status codes are normalized to:
+
+- `blocked`
+- `available`
+- `unpaid`
+- `paid`
 
 `has_food_*` is true only when the day has a paid, non-cancelled meal slot.
 

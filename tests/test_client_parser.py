@@ -92,7 +92,31 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertEqual(dashboard.order_paths, ("/Order/Show/ORDER_ID",))
         self.assertEqual(dashboard.current_month_order_status, "paid")
         self.assertFalse(dashboard.next_month_ordering_available)
+        self.assertEqual(dashboard.next_month_order_status, "blocked")
         self.assertEqual(dashboard.next_order_opening_date.isoformat(), "2026-05-25")
+
+    def test_parse_dashboard_html_detects_available_next_order(self) -> None:
+        html = """
+        <html>
+          <body>
+            Subkonto | CHILD_1
+            <section class="current-month">
+              Zamówienie SE/ORDER_ID/5/2026 zostało opłacone.
+              <a href="/Order/Show/ORDER_ID">Wyświetl</a>
+            </section>
+            <section class="next-month">
+              <h2>Następny miesiąc: czerwiec</h2>
+              <a href="/Order/Create">Złóż zamówienie</a>
+            </section>
+          </body>
+        </html>
+        """
+
+        dashboard = parse_dashboard_html(html)
+
+        self.assertTrue(dashboard.next_month_ordering_available)
+        self.assertEqual(dashboard.next_month_order_status, "available")
+        self.assertIsNone(dashboard.next_order_opening_date)
 
     def test_parse_dashboard_html_does_not_use_unrelated_dates_for_next_order(
         self,
