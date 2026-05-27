@@ -645,13 +645,7 @@ def parse_order_html(
         return ()
 
     meals: list[StartEduMeal] = []
-    for day_match in re.finditer(
-        r'<div class="day\s+([^"]*)"[^>]*data-number="(\d+)"[^>]*>'
-        r'(.*?)(?=<div class="day\s|</div>\s*</div>\s*<script|<script)',
-        html,
-        flags=re.IGNORECASE | re.DOTALL,
-    ):
-        classes, day_number, block = day_match.groups()
+    for classes, day_number, block in _iter_day_blocks(html):
         day = date(year, month, int(day_number))
         day_text = html_to_text(block)
         price = _extract_money_near_label(day_text, ("cena",)) or _extract_first_money(
@@ -1014,6 +1008,43 @@ def _extract_meal_id(text: str) -> str | None:
     if match:
         return match.group(1)
     return None
+
+
+def _iter_day_blocks(html: str) -> list[tuple[str, str, str]]:
+    day_starts = []
+    for match in re.finditer(r"<div\b[^>]*>", html, flags=re.IGNORECASE | re.DOTALL):
+        tag = match.group(0)
+        class_name = _extract_html_attr(tag, "class") or ""
+        if "day" not in class_name.split():
+            continue
+        day_number = _extract_html_attr(tag, "data-number")
+        if day_number is None or not day_number.isdigit():
+            continue
+        day_starts.append((match.start(), match.end(), class_name, day_number))
+
+    blocks = []
+    for index, (_, body_start, class_name, day_number) in enumerate(day_starts):
+        next_day_start = (
+            day_starts[index + 1][0]
+            if index + 1 < len(day_starts)
+            else len(html)
+        )
+        script_start = html.find("<script", body_start, next_day_start)
+        body_end = script_start if script_start != -1 else next_day_start
+        blocks.append((class_name, day_number, html[body_start:body_end]))
+    return blocks
+
+
+def _extract_html_attr(tag: str, attr_name: str) -> str | None:
+    match = re.search(
+        rf"\b{re.escape(attr_name)}\s*=\s*"
+        r"(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+))",
+        tag,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    return next(group for group in match.groups() if group is not None)
 
 
 def _extract_child_links(html: str) -> list[DashboardChildLink]:
