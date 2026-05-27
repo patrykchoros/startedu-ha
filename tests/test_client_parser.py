@@ -150,6 +150,41 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertTrue(meals[0].can_cancel)
         self.assertEqual(meals[1].status, "cancelled")
 
+    def test_parse_order_html_extracts_title_based_meal_preview(self) -> None:
+        html = """
+        <html>
+          <body>
+            <h1>Zamówienie nr SE/ORDER_ID/5/2026 na maj 2026</h1>
+            <div class="day green" data-number="27">
+              <div class="meal-preview">
+                <li class="title">Obiad</li>
+                <ul>
+                  <li>Zupa pomidorowa</li>
+                  <li>Ryż z warzywami <span class="allergen-info">1</span></li>
+                </ul>
+                <li class="title">Podwieczorek</li>
+                <ul><li>Jogurt</li></ul>
+                <div class="price" data-price="20.50">Cena: 20,50 zł</div>
+                <a data-action="cancel-meal" href="#">Odwołaj posiłek</a>
+                <div class="allergens-legend">
+                  <div class="label">1</div><div class="name">Gluten</div>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+        """
+
+        meals = parse_order_html(html, "CLIENT_ID_1", "CHILD_1", "paid")
+
+        self.assertEqual(len(meals), 2)
+        self.assertEqual(meals[0].name, "Obiad")
+        self.assertEqual(meals[0].menu, "Zupa pomidorowa Ryż z warzywami")
+        self.assertEqual(meals[1].name, "Podwieczorek")
+        self.assertEqual(meals[1].menu, "Jogurt")
+        self.assertTrue(all(meal.can_cancel for meal in meals))
+        self.assertEqual(meals[0].price, Decimal("20.50"))
+
     def test_parse_refunds_and_commitments_html(self) -> None:
         refunds_html = Path("tests/fixtures/startedu_refunds_sanitized.html").read_text(
             encoding="utf-8"
