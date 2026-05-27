@@ -1100,6 +1100,13 @@ def _status_from_day_block(classes: str, text: str, default_status: str) -> str:
 
 
 def _extract_meal_slots(block: str) -> list[tuple[str, str]]:
+    slots = _extract_heading_meal_slots(block)
+    if slots:
+        return slots
+    return _extract_title_meal_slots(block)
+
+
+def _extract_heading_meal_slots(block: str) -> list[tuple[str, str]]:
     slots = []
     matches = list(
         re.finditer(
@@ -1124,6 +1131,67 @@ def _extract_meal_slots(block: str) -> list[tuple[str, str]]:
         if label and menu:
             slots.append((label, menu))
     return slots
+
+
+def _extract_title_meal_slots(block: str) -> list[tuple[str, str]]:
+    slots = []
+    matches = list(
+        re.finditer(
+            r"<(?P<tag>div|li)\b[^>]*\bclass\s*=\s*"
+            r"(?:\"[^\"]*\btitle\b[^\"]*\"|'[^']*\btitle\b[^']*')"
+            r"[^>]*>(?P<body>.*?)</(?P=tag)>",
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    )
+    for index, match in enumerate(matches):
+        label = html_to_text(match.group("body"))
+        if meal_type_from_label(label) == "other":
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(block)
+        menu = _clean_menu_text(html_to_text(_clean_menu_fragment(block[start:end])))
+        if label and menu:
+            slots.append((label, menu))
+    return slots
+
+
+def _clean_menu_text(text: str) -> str:
+    return re.sub(r"\s*\|\s*", " ", text).strip()
+
+
+def _clean_menu_fragment(fragment: str) -> str:
+    fragment = re.sub(
+        r"<[^>]*\bclass\s*=\s*"
+        r"(?:\"[^\"]*\bprice\b[^\"]*\"|'[^']*\bprice\b[^']*')"
+        r"[^>]*>.*?</[^>]+>",
+        "",
+        fragment,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    fragment = re.sub(r"Cena:\s*" + MONEY_RE, "", fragment, flags=re.IGNORECASE)
+    fragment = re.sub(
+        r"<div\b[^>]*\bclass\s*=\s*"
+        r"(?:\"[^\"]*\ballergens-legend\b[^\"]*\"|"
+        r"'[^']*\ballergens-legend\b[^']*')[\s\S]*",
+        "",
+        fragment,
+        flags=re.IGNORECASE,
+    )
+    fragment = re.sub(
+        r"<[^>]*\bclass\s*=\s*"
+        r"(?:\"[^\"]*\ballergen-info\b[^\"]*\"|"
+        r"'[^']*\ballergen-info\b[^']*')[^>]*>.*?</[^>]+>",
+        "",
+        fragment,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    return re.sub(
+        r"<a\b[^>]*>.*?</a>",
+        "",
+        fragment,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
 
 
 def _strip_accents(value: str) -> str:
