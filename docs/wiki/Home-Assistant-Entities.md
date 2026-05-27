@@ -17,7 +17,6 @@ flowchart TD
     child --> binary["Food and cancellation binary sensors"]
 
     calendar --> cal_entity["calendar.<child>_meals"]
-    menu --> next_meal["sensor.<child>_next_meal"]
     menu --> day_menu["today/tomorrow menu sensors"]
     status --> order_state["order, refund, unpaid, update sensors"]
     binary --> food["has_food today/tomorrow"]
@@ -31,12 +30,11 @@ flowchart TD
 Cancelled meal events use a localized summary prefix because Home Assistant
 calendar events do not expose a native cancelled/status field. The original
 StartEdu meal label is kept unchanged, for example `CANCELLED: Obiad` in English
-or `ODWOŁANE: Obiad` in Polish. Unknown Home Assistant languages fall back to
-English.
+or `ODWOŁANE: Obiad` in Polish. Event descriptions contain only normalized menu
+text. Unknown Home Assistant languages fall back to English.
 
 ## Sensors
 
-- `sensor.<child>_next_meal`
 - `sensor.<child>_today_menu`
 - `sensor.<child>_tomorrow_menu`
 - `sensor.<child>_today_meal_status`
@@ -48,11 +46,9 @@ English.
 - `sensor.<child>_unpaid_amount`
 - `sensor.<child>_next_order_opening_date`
 
-`sensor.<child>_next_meal` exposes the next upcoming meal label as state and
-structured attributes for date, meal name, menu, meal type, child display name,
-status, order number, price, cancellation availability, and cancellation state.
-Meal attributes intentionally avoid raw StartEdu HTML, cookies, credentials, and
-internal child/meal identifiers.
+Menu attributes include localized `status` values for display and stable
+`status_code` values for automations. Meal attributes intentionally avoid raw
+StartEdu HTML, cookies, credentials, and internal child/meal identifiers.
 
 ## Binary Sensors
 

@@ -6,16 +6,35 @@ DEFAULT_LANGUAGE = "en"
 DEFAULT_CANCELLED_MEAL_PREFIX = "CANCELLED"
 EVENT_TRANSLATION_SECTION = "event"
 CANCELLED_MEAL_PREFIX_KEY = "cancelled_meal_prefix"
+STATUS_TRANSLATION_SECTION = "status"
 TRANSLATIONS: dict[str, dict[str, Any]] = {
     "en": {
         EVENT_TRANSLATION_SECTION: {
             CANCELLED_MEAL_PREFIX_KEY: DEFAULT_CANCELLED_MEAL_PREFIX,
-        }
+        },
+        STATUS_TRANSLATION_SECTION: {
+            "available": "available",
+            "blocked": "blocked",
+            "cancelled": "cancelled",
+            "no_school": "no school",
+            "not_ordered": "not ordered",
+            "paid": "paid",
+            "unpaid": "unpaid",
+        },
     },
     "pl": {
         EVENT_TRANSLATION_SECTION: {
             CANCELLED_MEAL_PREFIX_KEY: "ODWO\u0141ANE",
-        }
+        },
+        STATUS_TRANSLATION_SECTION: {
+            "available": "dost\u0119pne",
+            "blocked": "zablokowane",
+            "cancelled": "odwo\u0142ane",
+            "no_school": "brak zaj\u0119\u0107",
+            "not_ordered": "niezam\u00f3wione",
+            "paid": "op\u0142acone",
+            "unpaid": "nieop\u0142acone",
+        },
     },
 }
 
@@ -33,6 +52,18 @@ def cancelled_meal_prefix(language: str | None = None) -> str:
 def cancelled_meal_summary(meal_name: str, language: str | None = None) -> str:
     """Return the localized summary for a cancelled meal."""
     return f"{cancelled_meal_prefix(language)}: {meal_name}"
+
+
+def status_label(status: str | None, language: str | None = None) -> str | None:
+    """Return a localized entity-facing status label."""
+    if status is None or status == "unknown":
+        return None
+    return _translation(
+        language,
+        STATUS_TRANSLATION_SECTION,
+        status,
+        fallback=status,
+    )
 
 
 def _translation(

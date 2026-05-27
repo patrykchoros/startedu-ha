@@ -23,10 +23,8 @@ from .entity_model import (
     day_menu_attributes,
     day_menu_state,
     day_status,
-    meal_event_summary,
-    meal_public_attributes,
-    next_child_meal,
 )
+from .i18n import status_label
 from .models import StartEduChild
 
 
@@ -47,36 +45,42 @@ def _today_menu_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> str | None:
-    return day_menu_state(child, _target_date(coordinator, 0))
+    return day_menu_state(
+        child,
+        _target_date(coordinator, 0),
+        _hass_language(coordinator),
+    )
 
 
 def _tomorrow_menu_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> str | None:
-    return day_menu_state(child, _target_date(coordinator, 1))
+    return day_menu_state(
+        child,
+        _target_date(coordinator, 1),
+        _hass_language(coordinator),
+    )
 
 
 def _today_status_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> str:
-    return day_status(child, _target_date(coordinator, 0))
+) -> str | None:
+    return status_label(
+        day_status(child, _target_date(coordinator, 0)),
+        _hass_language(coordinator),
+    )
 
 
 def _tomorrow_status_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> str:
-    return day_status(child, _target_date(coordinator, 1))
-
-
-def _next_meal_value(
-    child: StartEduChild,
-    coordinator: StartEduDataUpdateCoordinator,
 ) -> str | None:
-    meal = next_child_meal(child, _target_date(coordinator, 0))
-    return meal_event_summary(meal) if meal else None
+    return status_label(
+        day_status(child, _target_date(coordinator, 1)),
+        _hass_language(coordinator),
+    )
 
 
 def _last_successful_update_value(
@@ -89,15 +93,21 @@ def _last_successful_update_value(
 def _current_month_order_status_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> str:
-    return child.current_month_order_status
+) -> str | None:
+    return status_label(
+        child.current_month_order_status,
+        _hass_language(coordinator),
+    )
 
 
 def _next_month_order_status_value(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
-) -> str:
-    return child.next_month_order_status
+) -> str | None:
+    return status_label(
+        child.next_month_order_status,
+        _hass_language(coordinator),
+    )
 
 
 def _refund_available_value(
@@ -125,31 +135,32 @@ def _today_menu_attributes(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> dict[str, Any]:
-    return day_menu_attributes(child, _target_date(coordinator, 0))
+    return day_menu_attributes(
+        child,
+        _target_date(coordinator, 0),
+        _hass_language(coordinator),
+    )
 
 
 def _tomorrow_menu_attributes(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
 ) -> dict[str, Any]:
-    return day_menu_attributes(child, _target_date(coordinator, 1))
+    return day_menu_attributes(
+        child,
+        _target_date(coordinator, 1),
+        _hass_language(coordinator),
+    )
 
 
-def _next_meal_attributes(
-    child: StartEduChild,
-    coordinator: StartEduDataUpdateCoordinator,
-) -> dict[str, Any]:
-    meal = next_child_meal(child, _target_date(coordinator, 0))
-    return meal_public_attributes(meal) if meal else {}
+def _hass_language(coordinator: StartEduDataUpdateCoordinator) -> str | None:
+    hass = getattr(coordinator, "hass", None)
+    config = getattr(hass, "config", None)
+    language = getattr(config, "language", None)
+    return str(language) if language else None
 
 
 SENSOR_DESCRIPTIONS: tuple[StartEduSensorDescription, ...] = (
-    StartEduSensorDescription(
-        key="next_meal",
-        translation_key="next_meal",
-        value_fn=_next_meal_value,
-        attributes_fn=_next_meal_attributes,
-    ),
     StartEduSensorDescription(
         key="today_menu",
         translation_key="today_menu",

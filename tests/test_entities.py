@@ -33,6 +33,7 @@ class FakeCoordinator:
     def __init__(self, data: StartEduAccountData, entry: FakeConfigEntry) -> None:
         self.data = data
         self.entry = entry
+        self.hass = None
 
 
 class EntityTests(unittest.IsolatedAsyncioTestCase):
@@ -67,14 +68,19 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[0].start.isoformat(), "2026-05-26T12:15:00+00:00")
         self.assertIsNotNone(events[0].start.tzinfo)
         self.assertIsNotNone(events[0].end.tzinfo)
-        self.assertIn("Status: paid", events[0].description)
-        self.assertIn("Status: cancelled", events[2].description)
+        self.assertEqual(events[0].description, "Rosół. Kotlet. Kompot.")
+        self.assertEqual(events[2].description, "Naleśniki.")
+        self.assertNotIn("Status:", events[0].description or "")
 
     async def test_sensor_setup_exposes_state_and_attributes(self) -> None:
         child = _child_with_meals()
         entry = FakeConfigEntry()
         coordinator = FakeCoordinator(_account_data(child), entry)
-        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: coordinator}})
+        hass = SimpleNamespace(
+            data={DOMAIN: {entry.entry_id: coordinator}},
+            config=SimpleNamespace(language="pl"),
+        )
+        coordinator.hass = hass
         entities = []
 
         await sensor.async_setup_entry(hass, entry, entities.extend)
@@ -96,7 +102,6 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         today_menu = _entity_by_key(entities, "today_menu")
         today_status = _entity_by_key(entities, "today_meal_status")
         tomorrow_status = _entity_by_key(entities, "tomorrow_meal_status")
-        next_meal = _entity_by_key(entities, "next_meal")
         last_update = _entity_by_key(entities, "last_successful_update")
         current_month = _entity_by_key(entities, "current_month_order_status")
         next_month = _entity_by_key(entities, "next_month_order_status")
@@ -108,40 +113,32 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
             today_menu.native_value,
             "Obiad: Rosół. Kotlet. Kompot.; Podwieczorek: Jabłko.",
         )
-        self.assertEqual(today_status.native_value, MEAL_STATUS_PAID)
-        self.assertEqual(tomorrow_status.native_value, MEAL_STATUS_CANCELLED)
-        self.assertEqual(next_meal.native_value, "Obiad")
+        self.assertEqual(today_status.native_value, "opłacone")
+        self.assertEqual(tomorrow_status.native_value, "odwołane")
         self.assertEqual(
             last_update.native_value,
             datetime(2026, 5, 26, 7, 0, tzinfo=timezone.utc),
         )
-        self.assertEqual(current_month.native_value, "ordered")
-        self.assertEqual(next_month.native_value, "open")
+        self.assertEqual(current_month.native_value, "opłacone")
+        self.assertEqual(next_month.native_value, "dostępne")
         self.assertEqual(next_opening.native_value, date(2026, 6, 15))
         self.assertEqual(refund.native_value, Decimal("12.50"))
         self.assertIsNone(unpaid.native_value)
         self.assertIsNone(refund.entity_description.suggested_unit_of_measurement)
 
         attributes = today_menu.extra_state_attributes
-        next_meal_attributes = next_meal.extra_state_attributes
 
         self.assertIsNotNone(attributes)
-        self.assertIsNotNone(next_meal_attributes)
         self.assertEqual(attributes["date"], "2026-05-26")
-        self.assertEqual(attributes["status"], MEAL_STATUS_PAID)
+        self.assertEqual(attributes["status"], "opłacone")
+        self.assertEqual(attributes["status_code"], MEAL_STATUS_PAID)
         self.assertEqual(attributes["order_number"], "ORDER-2026-05")
         self.assertEqual(len(attributes["meal_slots"]), 2)
         self.assertNotIn("meal_id", attributes["meal_slots"][0])
         self.assertNotIn("child_id", attributes["meal_slots"][0])
-        self.assertEqual(next_meal_attributes["date"], "2026-05-26")
-        self.assertEqual(next_meal_attributes["name"], "Obiad")
-        self.assertEqual(next_meal_attributes["menu"], "Rosół. Kotlet. Kompot.")
-        self.assertEqual(next_meal_attributes["meal_type"], MEAL_TYPE_LUNCH)
-        self.assertEqual(next_meal_attributes["child"], "Child 1")
-        self.assertEqual(next_meal_attributes["status"], MEAL_STATUS_PAID)
-        self.assertEqual(next_meal_attributes["order_number"], "ORDER-2026-05")
-        self.assertEqual(next_meal_attributes["price"], "20.50")
-        self.assertTrue(next_meal_attributes["can_cancel"])
+        self.assertEqual(attributes["meal_slots"][0]["menu"], "Rosół. Kotlet. Kompot.")
+        self.assertEqual(attributes["meal_slots"][0]["status"], "opłacone")
+        self.assertEqual(attributes["meal_slots"][0]["status_code"], MEAL_STATUS_PAID)
 
     async def test_binary_sensor_setup_exposes_read_only_flags(self) -> None:
         child = _child_with_meals()
@@ -190,22 +187,17 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         await sensor.async_setup_entry(hass, entry, entities.extend)
 
         self.assertEqual(len(entities), 2 * len(sensor.SENSOR_DESCRIPTIONS))
-        second_next_meal = next(
-            entity
-            for entity in entities
-            if entity._child.child_id == "CHILD-ID-2"
-            and entity.entity_description.key == "next_meal"
+        self.assertFalse(
+            any(entity.entity_description.key == "next_meal" for entity in entities)
         )
-        self.assertIsNone(second_next_meal.native_value)
-        self.assertIsNone(second_next_meal.extra_state_attributes)
 
 
 def _child_with_meals() -> StartEduChild:
     return StartEduChild(
         child_id="CHILD-ID-1",
         name="Child 1",
-        current_month_order_status="ordered",
-        next_month_order_status="open",
+        current_month_order_status="paid",
+        next_month_order_status="available",
         refund_available=Decimal("12.50"),
         unpaid_amount=None,
         next_order_opening_date=date(2026, 6, 15),
@@ -214,7 +206,7 @@ def _child_with_meals() -> StartEduChild:
                 meal_id="MEAL-26-LUNCH",
                 date=date(2026, 5, 26),
                 name="Obiad",
-                menu="Rosół. Kotlet. Kompot.",
+                menu="ROSÓŁ. KOTLET. KOMPOT.",
                 meal_type=MEAL_TYPE_LUNCH,
                 child_id="CHILD-ID-1",
                 child_name="Child 1",
@@ -227,7 +219,7 @@ def _child_with_meals() -> StartEduChild:
                 meal_id="MEAL-26-SNACK",
                 date=date(2026, 5, 26),
                 name="Podwieczorek",
-                menu="Jabłko.",
+                menu="jabłko.",
                 meal_type=MEAL_TYPE_AFTERNOON_SNACK,
                 child_id="CHILD-ID-1",
                 child_name="Child 1",

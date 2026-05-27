@@ -55,7 +55,6 @@ from custom_components.startedu.entity_model import (
     day_status,
     has_food,
     meal_event_summary,
-    meal_public_attributes,
     next_child_meal,
 )
 from custom_components.startedu.models import StartEduAccountData, StartEduChild
@@ -221,8 +220,8 @@ def build_entity_report(
         "meal_date_range": _meal_date_range(children),
         "expected_entities": {
             "account": 1,
-            "per_child": 17,
-            "sensor_per_child": 11,
+            "per_child": 16,
+            "sensor_per_child": 10,
             "binary_sensor_per_child": 5,
             "calendar_per_child": 1,
         },
@@ -285,10 +284,9 @@ def _child_entity_report(
     calendar_entries = calendar_meals(child)
     return {
         "index": index,
-        "entity_count": 17,
+        "entity_count": 16,
         "meal_count": len(child.meals),
         "sensors": {
-            "next_meal": _next_meal_entity(child, today),
             "today_menu": _menu_entity(child, today),
             "tomorrow_menu": _menu_entity(child, tomorrow),
             "today_meal_status": day_status(child, today),
@@ -318,28 +316,6 @@ def _child_entity_report(
                 "next_event": _next_calendar_event(child, today),
             }
         },
-    }
-
-
-def _next_meal_entity(child: StartEduChild, today: date) -> dict[str, Any]:
-    meal = next_child_meal(child, today)
-    if meal is None:
-        return {
-            "state": None,
-            "attribute_keys": [],
-            "menu_present": False,
-            "price_present": False,
-        }
-    attributes = meal_public_attributes(meal)
-    return {
-        "state": meal_event_summary(meal),
-        "date": meal.date.isoformat(),
-        "status": meal.status,
-        "meal_type": meal.meal_type,
-        "can_cancel": meal.can_cancel,
-        "attribute_keys": sorted(attributes),
-        "menu_present": bool(meal.menu),
-        "price_present": meal.price is not None,
     }
 
 
@@ -533,7 +509,6 @@ def format_entity_report(report: dict[str, Any]) -> str:
                     f"today={sensors['today_meal_status']} "
                     f"tomorrow={sensors['tomorrow_meal_status']}"
                 ),
-                _format_next_meal_entity(sensors["next_meal"]),
                 (
                     "order_sensors: "
                     f"current={sensors['current_month_order_status']} "
@@ -568,18 +543,6 @@ def _format_entity_menu(label: str, menu: dict[str, Any]) -> str:
         f"full_menu={menu['full_menu_present']} "
         f"orders_present={menu['order_numbers_present']} "
         f"can_cancel={menu['can_cancel']} meal_types={meal_types}"
-    )
-
-
-def _format_next_meal_entity(next_meal: dict[str, Any]) -> str:
-    if next_meal["state"] is None:
-        return "next_meal: <none>"
-    keys = ",".join(next_meal["attribute_keys"])
-    return (
-        f"next_meal: state={next_meal['state']} date={next_meal['date']} "
-        f"status={next_meal['status']} type={next_meal['meal_type']} "
-        f"can_cancel={next_meal['can_cancel']} menu={next_meal['menu_present']} "
-        f"price={next_meal['price_present']} attribute_keys={keys}"
     )
 
 
