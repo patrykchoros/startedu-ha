@@ -10,7 +10,9 @@ integration.
 - [Home Assistant Entities](Home-Assistant-Entities)
 - [Synchronization Strategy](Synchronization-Strategy)
 - [Security and Credentials](Security-and-Credentials)
+- [Release Process](Release-Process)
 - [Release Checklist](Release-Checklist)
+- [Release Notes Template](Release-Notes-Template)
 
 ## Project Shape
 

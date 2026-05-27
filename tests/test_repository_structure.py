@@ -55,18 +55,35 @@ class RepositoryStructureTests(unittest.TestCase):
 
     def test_installation_docs_and_release_checklist_present(self) -> None:
         readme = Path("README.md").read_text(encoding="utf-8")
+        process = Path("docs/release-process.md").read_text(encoding="utf-8")
         checklist = Path("docs/release-checklist.md").read_text(encoding="utf-8")
+        template = Path("docs/release-notes-template.md").read_text(
+            encoding="utf-8"
+        )
         wiki_home = Path("docs/wiki/Home.md").read_text(encoding="utf-8")
 
         self.assertIn("HACS Custom Repository", readme)
         self.assertIn("https://github.com/patrykchoros/startedu-ha", readme)
         self.assertIn("Development Status", readme)
         self.assertIn("Security", readme)
+        self.assertIn("release process", readme)
         self.assertIn("release checklist", readme)
+        self.assertIn("release notes template", readme)
+        self.assertIn("MAJOR.MINOR.PATCH", process)
+        self.assertIn("GitHub Release tag", process)
+        self.assertIn("recommended version for Home Assistant testing", process)
         self.assertIn("python -m unittest discover -s tests", checklist)
         self.assertIn("manifest.json` `version`", checklist)
+        self.assertIn("annotated tag", checklist)
+        self.assertIn("Breaking Changes", template)
+        self.assertIn("Known Issues", template)
+        self.assertIn("Verification", template)
+        self.assertIn("[Release Process](Release-Process)", wiki_home)
         self.assertIn("[Release Checklist](Release-Checklist)", wiki_home)
+        self.assertIn("[Release Notes Template](Release-Notes-Template)", wiki_home)
+        self.assertTrue(Path("docs/wiki/Release-Process.md").exists())
         self.assertTrue(Path("docs/wiki/Release-Checklist.md").exists())
+        self.assertTrue(Path("docs/wiki/Release-Notes-Template.md").exists())
 
     def test_polish_translations_cover_source_strings(self) -> None:
         source = json.loads(
