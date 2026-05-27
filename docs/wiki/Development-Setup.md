@@ -13,6 +13,42 @@ python -m compileall custom_components tests
 python -m unittest discover -s tests
 ```
 
+## Local StartEdu Probe
+
+Use the local probe to test StartEdu authentication and parsing without
+installing or restarting Home Assistant:
+
+```bash
+python scripts/startedu_probe.py
+```
+
+The probe uses the same `StartEduClient` parser as the integration, but runs
+with a tiny local HTTP session and prints only sanitized summary data:
+
+- child count and per-child meal counts,
+- meal date range,
+- today/tomorrow status flags,
+- refund and unpaid totals,
+- redacted StartEdu diagnostics from the client logger.
+
+For repeat local runs, credentials may be placed outside Git in
+`.local/startedu-test.env`:
+
+```dotenv
+STARTEDU_USERNAME=
+STARTEDU_PASSWORD=
+```
+
+JSON output is available for attaching sanitized diagnostics to issues:
+
+```bash
+python scripts/startedu_probe.py --json
+```
+
+Do not paste credentials, cookies, raw HTML, child names, child identifiers, or
+order identifiers into issues. The probe output is designed to avoid those
+values by default.
+
 ## Home Assistant Manual Test
 
 1. Add this repository as a HACS custom repository with category

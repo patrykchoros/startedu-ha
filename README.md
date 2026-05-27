@@ -82,3 +82,13 @@ inspect account data, child switching, menus, payment status, and page
 structure. Mutating tests require an explicit issue-backed plan and approval
 before execution. Do not use the account to place meal orders or confirm any
 StartEdu modal that would mutate account state outside an approved test plan.
+
+For faster parser/authentication diagnostics without installing the integration
+in Home Assistant, run the local sanitized probe:
+
+```bash
+python scripts/startedu_probe.py
+```
+
+The probe uses the same StartEdu client as the integration and avoids printing
+credentials, child identifiers, order identifiers, cookies, or raw HTML.
