@@ -49,6 +49,11 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         await calendar.async_setup_entry(hass, entry, entities.extend)
 
         self.assertEqual(len(entities), 1)
+        current_event = entities[0].event
+        self.assertIsNotNone(current_event)
+        self.assertEqual(current_event.summary, "Obiad")
+        self.assertIsNotNone(current_event.start.tzinfo)
+
         events = await entities[0].async_get_events(
             hass,
             date(2026, 5, 26),
@@ -59,7 +64,9 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
             [event.summary for event in events],
             ["Obiad", "Podwieczorek", "ODWOŁANE: Obiad"],
         )
-        self.assertEqual(events[0].start.isoformat(), "2026-05-26T12:15:00")
+        self.assertEqual(events[0].start.isoformat(), "2026-05-26T12:15:00+00:00")
+        self.assertIsNotNone(events[0].start.tzinfo)
+        self.assertIsNotNone(events[0].end.tzinfo)
         self.assertIn("Status: paid", events[0].description)
         self.assertIn("Status: cancelled", events[2].description)
 

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-from functools import lru_cache
-import json
-from pathlib import Path
 from typing import Any
 
 DEFAULT_LANGUAGE = "en"
 DEFAULT_CANCELLED_MEAL_PREFIX = "CANCELLED"
 EVENT_TRANSLATION_SECTION = "event"
 CANCELLED_MEAL_PREFIX_KEY = "cancelled_meal_prefix"
+TRANSLATIONS: dict[str, dict[str, Any]] = {
+    "en": {
+        EVENT_TRANSLATION_SECTION: {
+            CANCELLED_MEAL_PREFIX_KEY: DEFAULT_CANCELLED_MEAL_PREFIX,
+        }
+    },
+    "pl": {
+        EVENT_TRANSLATION_SECTION: {
+            CANCELLED_MEAL_PREFIX_KEY: "ODWO\u0141ANE",
+        }
+    },
+}
 
 
 def cancelled_meal_prefix(language: str | None = None) -> str:
@@ -34,7 +43,7 @@ def _translation(
     fallback: str,
 ) -> str:
     for language_code in _language_candidates(language):
-        value = _nested_get(_load_translation(language_code), section, key)
+        value = _nested_get(TRANSLATIONS.get(language_code, {}), section, key)
         if isinstance(value, str) and value:
             return value
     return fallback
@@ -50,25 +59,6 @@ def _language_candidates(language: str | None) -> tuple[str, ...]:
             candidates.append(base_language)
     candidates.append(DEFAULT_LANGUAGE)
     return tuple(dict.fromkeys(candidates))
-
-
-@lru_cache(maxsize=None)
-def _load_translation(language: str) -> dict[str, Any]:
-    base_path = Path(__file__).parent
-    paths = [base_path / "translations" / f"{language}.json"]
-    if language == DEFAULT_LANGUAGE:
-        paths.append(base_path / "strings.json")
-
-    for path in paths:
-        if not path.exists():
-            continue
-        try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(loaded, dict):
-            return loaded
-    return {}
 
 
 def _nested_get(data: dict[str, Any], *keys: str) -> Any:
