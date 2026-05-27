@@ -12,7 +12,12 @@ from custom_components.startedu.models import (
     StartEduChild,
     StartEduMeal,
 )
-from scripts.startedu_probe import build_probe_report, format_probe_report
+from scripts.startedu_probe import (
+    build_entity_report,
+    build_probe_report,
+    format_entity_report,
+    format_probe_report,
+)
 
 
 class StartEduProbeTests(unittest.TestCase):
@@ -69,3 +74,52 @@ class StartEduProbeTests(unittest.TestCase):
             self.assertNotIn(secret, serialized)
             self.assertNotIn(secret, formatted)
 
+    def test_entity_report_is_sanitized_and_covers_expected_entities(self) -> None:
+        data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 27, 10, 0, tzinfo=timezone.utc),
+            children=(
+                StartEduChild(
+                    child_id="SECRET_CHILD_ID_1",
+                    name="Secret Child 1",
+                    current_month_order_status="paid",
+                    refund_available=Decimal("12.50"),
+                    unpaid_amount=Decimal("0.00"),
+                    meals=(
+                        StartEduMeal(
+                            meal_id="SECRET_MEAL_ID",
+                            date=date(2026, 5, 27),
+                            name="Obiad",
+                            menu="Secret menu text",
+                            meal_type=MEAL_TYPE_LUNCH,
+                            status=MEAL_STATUS_PAID,
+                            child_id="SECRET_CHILD_ID_1",
+                            child_name="Secret Child 1",
+                            can_cancel=True,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        report = build_entity_report(data, today=date(2026, 5, 27))
+        formatted = format_entity_report(report)
+        serialized = json.dumps(report, ensure_ascii=False)
+        child = report["children"][0]
+
+        self.assertEqual(report["expected_entities"]["per_child"], 17)
+        self.assertEqual(report["expected_entities"]["account"], 1)
+        self.assertEqual(child["entity_count"], 17)
+        self.assertTrue(child["sensors"]["today_menu"]["state_present"])
+        self.assertEqual(child["sensors"]["today_menu"]["meal_slots"], 1)
+        self.assertTrue(child["binary_sensors"]["has_food_today"])
+        self.assertEqual(child["calendar"]["meals"]["events"], 1)
+        self.assertIn("expected_entities: account=1 per_child=17", formatted)
+
+        for secret in (
+            "SECRET_CHILD_ID_1",
+            "SECRET_MEAL_ID",
+            "Secret Child",
+            "Secret menu text",
+        ):
+            self.assertNotIn(secret, serialized)
+            self.assertNotIn(secret, formatted)
