@@ -56,8 +56,12 @@ not published as a default HACS repository yet.
   and manual refresh.
 - Meal cancellation action: implemented as an explicit service call.
 
-Before public distribution, follow the
-[release checklist](docs/release-checklist.md).
+Before public distribution or broader Home Assistant testing, follow the
+[release process](docs/release-process.md), the
+[release checklist](docs/release-checklist.md), and the
+[release notes template](docs/release-notes-template.md). The recommended
+install target for testers should be a GitHub Release tag rather than an
+unlabeled `main` commit, except during short-lived issue diagnostics.
 
 ## Security
 

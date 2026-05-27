@@ -61,3 +61,12 @@ values by default.
 
 Never store real credentials, cookies, or captured authenticated pages in this
 repository.
+
+## Release Workflow
+
+Before asking users to install or test a specific version, follow the
+[Release Process](Release-Process), [Release Checklist](Release-Checklist), and
+[Release Notes Template](Release-Notes-Template).
+
+Normal Home Assistant testing should use a GitHub Release tag. Raw `main` commit
+SHAs are reserved for short-lived diagnostics in an active issue.
