@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, tzinfo
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import StartEduDataUpdateCoordinator
@@ -15,6 +16,7 @@ from .entity_model import (
     meal_event_description,
     meal_event_summary,
     meal_time_window,
+    next_child_meal,
 )
 from .models import StartEduChild, StartEduMeal
 
@@ -48,7 +50,7 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
 
     @property
     def event(self) -> CalendarEvent | None:
-        meal = self._child.next_meal
+        meal = next_child_meal(self._child, dt_util.now().date())
         if meal is None:
             return None
         return _meal_to_event(
@@ -72,7 +74,7 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
         return [
             _meal_to_event(meal, self.coordinator.entry.options, language)
             for meal in calendar_meals(self._child)
-            if start <= meal_time_window(meal, self.coordinator.entry.options).start < end
+            if _meal_starts_in_range(meal, self.coordinator.entry.options, start, end)
         ]
 
 
@@ -84,16 +86,36 @@ def _meal_to_event(
     window = meal_time_window(meal, options)
     return CalendarEvent(
         summary=meal_event_summary(meal, language),
-        start=window.start,
-        end=window.end,
+        start=_with_ha_timezone(window.start),
+        end=_with_ha_timezone(window.end),
         description=meal_event_description(meal),
     )
 
 
+def _meal_starts_in_range(
+    meal: StartEduMeal,
+    options: dict[str, object],
+    start: datetime,
+    end: datetime,
+) -> bool:
+    meal_start = _with_ha_timezone(meal_time_window(meal, options).start)
+    return start <= meal_start < end
+
+
 def _as_datetime(value: date | datetime) -> datetime:
     if isinstance(value, datetime):
+        return _with_ha_timezone(value)
+    return _with_ha_timezone(datetime.combine(value, datetime.min.time()))
+
+
+def _with_ha_timezone(value: datetime) -> datetime:
+    if value.tzinfo is not None and value.utcoffset() is not None:
         return value
-    return datetime.combine(value, datetime.min.time())
+    return value.replace(tzinfo=_ha_timezone())
+
+
+def _ha_timezone() -> tzinfo:
+    return dt_util.DEFAULT_TIME_ZONE
 
 
 def _hass_language(hass: HomeAssistant | None) -> str | None:

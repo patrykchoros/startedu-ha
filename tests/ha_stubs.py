@@ -69,6 +69,7 @@ def install_homeassistant_stubs(
     util.__path__ = []
 
     dt = _module("homeassistant.util.dt")
+    dt.DEFAULT_TIME_ZONE = timezone.utc
     dt.now = lambda: current_time
 
     components = _module("homeassistant.components")
@@ -247,6 +248,15 @@ class CalendarEvent:
         end: Any,
         description: str | None = None,
     ) -> None:
+        for value in (start, end):
+            if (
+                isinstance(value, datetime)
+                and (value.tzinfo is None or value.utcoffset() is None)
+            ):
+                raise HomeAssistantError(
+                    "Failed to validate CalendarEvent: "
+                    "Expected all values to have a timezone"
+                )
         self.summary = summary
         self.start = start
         self.end = end
