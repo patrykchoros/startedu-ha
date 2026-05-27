@@ -617,7 +617,11 @@ def parse_dashboard_html(html: str) -> DashboardSnapshot:
     elif "mozliwe" in normalized_text and "nadchodzacy miesiac" in normalized_text:
         next_available = True
         next_status = "available"
-    opening_date = _extract_date(text)
+    opening_date = (
+        _extract_next_order_opening_date(text, normalized_text)
+        if next_available is False
+        else None
+    )
     return DashboardSnapshot(
         active_child_id=active_child_id,
         active_child_name=active_child_name,
@@ -903,6 +907,26 @@ def _extract_date(text: str) -> date | None:
             return date(year, month, day)
         except ValueError:
             return None
+    return None
+
+
+def _extract_next_order_opening_date(
+    text: str,
+    normalized_text: str | None = None,
+) -> date | None:
+    normalized = normalized_text or _strip_accents(text).casefold()
+    markers = (
+        "planowana data uruchomienia zamowien",
+        "data uruchomienia zamowien",
+        "tworzenie zamowien na nadchodzacy miesiac",
+    )
+    for marker in markers:
+        marker_index = normalized.find(marker)
+        if marker_index == -1:
+            continue
+        opening_date = _extract_date(text[marker_index : marker_index + 300])
+        if opening_date is not None:
+            return opening_date
     return None
 
 

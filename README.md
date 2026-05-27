@@ -90,5 +90,12 @@ in Home Assistant, run the local sanitized probe:
 python scripts/startedu_probe.py
 ```
 
+To verify the Home Assistant entity model that would be produced from the same
+StartEdu pages, run:
+
+```bash
+python scripts/startedu_probe.py --entities
+```
+
 The probe uses the same StartEdu client as the integration and avoids printing
 credentials, child identifiers, order identifiers, cookies, or raw HTML.

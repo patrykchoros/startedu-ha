@@ -48,9 +48,14 @@ from custom_components.startedu.client import StartEduClient, StartEduError
 from custom_components.startedu.const import DEFAULT_BASE_URL
 from custom_components.startedu.entity_model import (
     can_cancel,
+    calendar_meals,
+    day_menu_attributes,
+    day_menu_state,
     day_meals,
     day_status,
     has_food,
+    meal_event_summary,
+    meal_public_attributes,
     next_child_meal,
 )
 from custom_components.startedu.models import StartEduAccountData, StartEduChild
@@ -201,6 +206,40 @@ def build_probe_report(
     }
 
 
+def build_entity_report(
+    data: StartEduAccountData,
+    *,
+    today: date | None = None,
+) -> dict[str, Any]:
+    today = today or date.today()
+    children = list(data.child_accounts)
+    return {
+        "fetched_at": data.fetched_at.isoformat(),
+        "today": today.isoformat(),
+        "children_count": len(children),
+        "total_meals": sum(len(child.meals) for child in children),
+        "meal_date_range": _meal_date_range(children),
+        "expected_entities": {
+            "account": 1,
+            "per_child": 17,
+            "sensor_per_child": 11,
+            "binary_sensor_per_child": 5,
+            "calendar_per_child": 1,
+        },
+        "account_entities": {
+            "refresh_startedu_data": {
+                "available": True,
+                "source": "coordinator_refresh",
+            }
+        },
+        "children": [
+            _child_entity_report(child, index, data.fetched_at, today)
+            for index, child in enumerate(children, start=1)
+        ],
+        "warnings": _entity_report_warnings(children, today),
+    }
+
+
 def _child_report(
     child: StartEduChild,
     index: int,
@@ -233,6 +272,104 @@ def _child_report(
         ),
         "refund_available": _decimal_to_string(child.refund_available),
         "unpaid_amount": _decimal_to_string(child.unpaid_amount),
+    }
+
+
+def _child_entity_report(
+    child: StartEduChild,
+    index: int,
+    fetched_at: Any,
+    today: date,
+) -> dict[str, Any]:
+    tomorrow = today + timedelta(days=1)
+    calendar_entries = calendar_meals(child)
+    return {
+        "index": index,
+        "entity_count": 17,
+        "meal_count": len(child.meals),
+        "sensors": {
+            "next_meal": _next_meal_entity(child, today),
+            "today_menu": _menu_entity(child, today),
+            "tomorrow_menu": _menu_entity(child, tomorrow),
+            "today_meal_status": day_status(child, today),
+            "tomorrow_meal_status": day_status(child, tomorrow),
+            "last_successful_update": fetched_at.isoformat(),
+            "current_month_order_status": child.current_month_order_status,
+            "next_month_order_status": child.next_month_order_status,
+            "refund_available": _decimal_to_string(child.refund_available),
+            "unpaid_amount": _decimal_to_string(child.unpaid_amount),
+            "next_order_opening_date": (
+                child.next_order_opening_date.isoformat()
+                if child.next_order_opening_date is not None
+                else None
+            ),
+        },
+        "binary_sensors": {
+            "has_food_today": has_food(child, today),
+            "has_food_tomorrow": has_food(child, tomorrow),
+            "can_cancel_today_meal": can_cancel(child, today),
+            "can_cancel_tomorrow_meal": can_cancel(child, tomorrow),
+            "next_month_ordering_available": child.next_month_ordering_available,
+        },
+        "calendar": {
+            "meals": {
+                "events": len(calendar_entries),
+                "date_range": _meal_range(calendar_entries),
+                "next_event": _next_calendar_event(child, today),
+            }
+        },
+    }
+
+
+def _next_meal_entity(child: StartEduChild, today: date) -> dict[str, Any]:
+    meal = next_child_meal(child, today)
+    if meal is None:
+        return {
+            "state": None,
+            "attribute_keys": [],
+            "menu_present": False,
+            "price_present": False,
+        }
+    attributes = meal_public_attributes(meal)
+    return {
+        "state": meal_event_summary(meal),
+        "date": meal.date.isoformat(),
+        "status": meal.status,
+        "meal_type": meal.meal_type,
+        "can_cancel": meal.can_cancel,
+        "attribute_keys": sorted(attributes),
+        "menu_present": bool(meal.menu),
+        "price_present": meal.price is not None,
+    }
+
+
+def _menu_entity(child: StartEduChild, target_date: date) -> dict[str, Any]:
+    state = day_menu_state(child, target_date)
+    attributes = day_menu_attributes(child, target_date)
+    meal_slots = attributes["meal_slots"]
+    return {
+        "date": target_date.isoformat(),
+        "state_present": state is not None,
+        "state_length": len(state or ""),
+        "status": attributes["status"],
+        "is_cancelled": attributes["is_cancelled"],
+        "meal_slots": len(meal_slots),
+        "meal_types": sorted({slot["meal_type"] for slot in meal_slots}),
+        "full_menu_present": attributes["full_menu"] is not None,
+        "order_numbers_present": bool(attributes["order_numbers"]),
+        "can_cancel": any(slot["can_cancel"] for slot in meal_slots),
+    }
+
+
+def _next_calendar_event(child: StartEduChild, today: date) -> dict[str, Any] | None:
+    meal = next_child_meal(child, today)
+    if meal is None:
+        return None
+    return {
+        "date": meal.date.isoformat(),
+        "summary": meal_event_summary(meal),
+        "status": meal.status,
+        "meal_type": meal.meal_type,
     }
 
 
@@ -270,8 +407,38 @@ def _report_warnings(children: list[StartEduChild], today: date) -> list[str]:
     return warnings
 
 
+def _entity_report_warnings(children: list[StartEduChild], today: date) -> list[str]:
+    warnings = []
+    if not children:
+        return ["no_child_entities"]
+
+    for index, child in enumerate(children, start=1):
+        if not calendar_meals(child):
+            warnings.append(f"child_{index}_no_calendar_events")
+        if day_status(child, today) == "unknown":
+            warnings.append(f"child_{index}_today_status_unknown")
+        if child.refund_available is None:
+            warnings.append(f"child_{index}_refund_missing")
+        if child.unpaid_amount is None:
+            warnings.append(f"child_{index}_unpaid_amount_missing")
+        if (
+            child.next_order_opening_date is not None
+            and child.next_month_ordering_available is None
+            and child.next_month_order_status == "unknown"
+        ):
+            warnings.append(f"child_{index}_next_order_opening_date_unscoped")
+    return warnings
+
+
 def _meal_date_range(children: list[StartEduChild]) -> str | None:
     dates = sorted(meal.date for child in children for meal in child.meals)
+    if not dates:
+        return None
+    return f"{dates[0].isoformat()}..{dates[-1].isoformat()}"
+
+
+def _meal_range(meals: tuple[Any, ...]) -> str | None:
+    dates = sorted(meal.date for meal in meals)
     if not dates:
         return None
     return f"{dates[0].isoformat()}..{dates[-1].isoformat()}"
@@ -322,6 +489,109 @@ def format_probe_report(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_entity_report(report: dict[str, Any]) -> str:
+    expected = report["expected_entities"]
+    lines = [
+        "StartEdu entity verification",
+        f"fetched_at: {report['fetched_at']}",
+        f"today: {report['today']}",
+        (
+            f"children: {report['children_count']} | "
+            f"total_meals: {report['total_meals']} | "
+            f"meal_date_range: {report['meal_date_range'] or '<empty>'}"
+        ),
+        (
+            "expected_entities: "
+            f"account={expected['account']} "
+            f"per_child={expected['per_child']} "
+            f"(sensor={expected['sensor_per_child']}, "
+            f"binary_sensor={expected['binary_sensor_per_child']}, "
+            f"calendar={expected['calendar_per_child']})"
+        ),
+        "account.refresh_startedu_data: available=True source=coordinator_refresh",
+    ]
+    if report["warnings"]:
+        lines.append(f"warnings: {', '.join(report['warnings'])}")
+
+    for child in report["children"]:
+        sensors = child["sensors"]
+        binary_sensors = child["binary_sensors"]
+        calendar = child["calendar"]["meals"]
+        lines.extend(
+            [
+                "",
+                (
+                    f"child #{child['index']}: entities={child['entity_count']} "
+                    f"meals={child['meal_count']} "
+                    f"calendar_events={calendar['events']} "
+                    f"calendar_dates={calendar['date_range'] or '<empty>'}"
+                ),
+                _format_entity_menu("today_menu", sensors["today_menu"]),
+                _format_entity_menu("tomorrow_menu", sensors["tomorrow_menu"]),
+                (
+                    "status_sensors: "
+                    f"today={sensors['today_meal_status']} "
+                    f"tomorrow={sensors['tomorrow_meal_status']}"
+                ),
+                _format_next_meal_entity(sensors["next_meal"]),
+                (
+                    "order_sensors: "
+                    f"current={sensors['current_month_order_status']} "
+                    f"next={sensors['next_month_order_status']} "
+                    f"next_opening={sensors['next_order_opening_date'] or '<none>'} "
+                    f"next_available={binary_sensors['next_month_ordering_available']}"
+                ),
+                (
+                    "money_sensors: "
+                    f"refund={sensors['refund_available'] or '<none>'} "
+                    f"unpaid={sensors['unpaid_amount'] or '<none>'}"
+                ),
+                (
+                    "binary_sensors: "
+                    f"has_food_today={binary_sensors['has_food_today']} "
+                    f"has_food_tomorrow={binary_sensors['has_food_tomorrow']} "
+                    f"can_cancel_today={binary_sensors['can_cancel_today_meal']} "
+                    f"can_cancel_tomorrow={binary_sensors['can_cancel_tomorrow_meal']}"
+                ),
+                f"calendar.next_event: {_format_calendar_event(calendar['next_event'])}",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _format_entity_menu(label: str, menu: dict[str, Any]) -> str:
+    meal_types = ",".join(menu["meal_types"]) or "<none>"
+    return (
+        f"{label}: date={menu['date']} state_present={menu['state_present']} "
+        f"state_length={menu['state_length']} status={menu['status']} "
+        f"cancelled={menu['is_cancelled']} slots={menu['meal_slots']} "
+        f"full_menu={menu['full_menu_present']} "
+        f"orders_present={menu['order_numbers_present']} "
+        f"can_cancel={menu['can_cancel']} meal_types={meal_types}"
+    )
+
+
+def _format_next_meal_entity(next_meal: dict[str, Any]) -> str:
+    if next_meal["state"] is None:
+        return "next_meal: <none>"
+    keys = ",".join(next_meal["attribute_keys"])
+    return (
+        f"next_meal: state={next_meal['state']} date={next_meal['date']} "
+        f"status={next_meal['status']} type={next_meal['meal_type']} "
+        f"can_cancel={next_meal['can_cancel']} menu={next_meal['menu_present']} "
+        f"price={next_meal['price_present']} attribute_keys={keys}"
+    )
+
+
+def _format_calendar_event(event: dict[str, Any] | None) -> str:
+    if event is None:
+        return "<none>"
+    return (
+        f"{event['date']} {event['summary']} "
+        f"status={event['status']} type={event['meal_type']}"
+    )
+
+
 def _format_counts(counts: list[int]) -> str:
     return ",".join(str(count) for count in counts) or "<empty>"
 
@@ -365,6 +635,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--json", action="store_true", help="print JSON output")
+    parser.add_argument(
+        "--entities",
+        action="store_true",
+        help="verify sanitized Home Assistant entity values instead of summary output",
+    )
     parser.add_argument(
         "--fail-on-empty-meals",
         action="store_true",
@@ -412,9 +687,11 @@ async def async_main(argv: list[str]) -> int:
         print(f"StartEdu probe failed: {err}", file=sys.stderr)
         return 2
 
-    report = build_probe_report(data)
+    report = build_entity_report(data) if args.entities else build_probe_report(data)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2, default=_json_default))
+    elif args.entities:
+        print(format_entity_report(report))
     else:
         print(format_probe_report(report))
 

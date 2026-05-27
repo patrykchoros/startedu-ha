@@ -94,6 +94,29 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertFalse(dashboard.next_month_ordering_available)
         self.assertEqual(dashboard.next_order_opening_date.isoformat(), "2026-05-25")
 
+    def test_parse_dashboard_html_does_not_use_unrelated_dates_for_next_order(
+        self,
+    ) -> None:
+        html = """
+        <html>
+          <body>
+            Subkonto | CHILD_1
+            <section class="current-month">
+              Zamówienie SE/ORDER_ID/5/2026 zostało opłacone.
+              <a href="/Order/Show/ORDER_ID">Wyświetl</a>
+            </section>
+            <footer>Regulamin obowiązuje od 25 maja 2018.</footer>
+          </body>
+        </html>
+        """
+
+        dashboard = parse_dashboard_html(html)
+
+        self.assertEqual(dashboard.current_month_order_status, "paid")
+        self.assertIsNone(dashboard.next_month_ordering_available)
+        self.assertEqual(dashboard.next_month_order_status, "unknown")
+        self.assertIsNone(dashboard.next_order_opening_date)
+
     def test_parse_order_html_extracts_meal_slots(self) -> None:
         html = Path("tests/fixtures/startedu_order_show_sanitized.html").read_text(
             encoding="utf-8"
