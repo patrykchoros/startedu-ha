@@ -1247,7 +1247,7 @@ def _extract_heading_meal_slots(block: str) -> list[tuple[str, str]]:
             fragment,
             flags=re.IGNORECASE | re.DOTALL,
         )
-        menu = html_to_text(fragment)
+        menu = _extract_menu_text(fragment)
         if label and menu:
             slots.append((label, menu))
     return slots
@@ -1270,14 +1270,35 @@ def _extract_title_meal_slots(block: str) -> list[tuple[str, str]]:
             continue
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(block)
-        menu = _clean_menu_text(html_to_text(_clean_menu_fragment(block[start:end])))
+        menu = _extract_menu_text(block[start:end])
         if label and menu:
             slots.append((label, menu))
     return slots
 
 
+def _extract_menu_text(fragment: str) -> str:
+    cleaned = _clean_menu_fragment(fragment)
+    items = [
+        _clean_menu_text(html_to_text(match.group(1)))
+        for match in re.finditer(
+            r"<li\b(?![^>]*\bclass\s*=\s*"
+            r"(?:\"[^\"]*\btitle\b[^\"]*\"|'[^']*\btitle\b[^']*'))"
+            r"[^>]*>(.*?)</li>",
+            cleaned,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    ]
+    items = [item for item in items if item and not _is_money(item)]
+    if items:
+        return ", ".join(items)
+    return _clean_menu_text(html_to_text(cleaned))
+
+
 def _clean_menu_text(text: str) -> str:
-    return re.sub(r"\s*\|\s*", " ", text).strip()
+    text = re.sub(r"\s*/\s*", " / ", text)
+    text = re.sub(r"\s*,\s*", ", ", text)
+    text = re.sub(r"\s*\|\s*", " ", text)
+    return re.sub(r"\s+", " ", text).strip(" ,")
 
 
 def _clean_menu_fragment(fragment: str) -> str:

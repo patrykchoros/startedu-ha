@@ -219,7 +219,7 @@ def build_entity_report(
         "total_meals": sum(len(child.meals) for child in children),
         "meal_date_range": _meal_date_range(children),
         "expected_entities": {
-            "account": 1,
+            "account": 4,
             "per_child": 16,
             "sensor_per_child": 10,
             "binary_sensor_per_child": 5,
@@ -229,7 +229,19 @@ def build_entity_report(
             "refresh_startedu_data": {
                 "available": True,
                 "source": "coordinator_refresh",
-            }
+            },
+            "sync_status": {
+                "available": True,
+                "states": ["waiting", "running"],
+            },
+            "last_sync_status": {
+                "available": True,
+                "states": ["successful", "failed"],
+            },
+            "last_sync_time": {
+                "available": True,
+                "device_class": "timestamp",
+            },
         },
         "children": [
             _child_entity_report(child, index, data.fetched_at, today)
@@ -485,6 +497,9 @@ def format_entity_report(report: dict[str, Any]) -> str:
             f"calendar={expected['calendar_per_child']})"
         ),
         "account.refresh_startedu_data: available=True source=coordinator_refresh",
+        "account.sync_status: available=True states=waiting,running",
+        "account.last_sync_status: available=True states=successful,failed",
+        "account.last_sync_time: available=True device_class=timestamp",
     ]
     if report["warnings"]:
         lines.append(f"warnings: {', '.join(report['warnings'])}")

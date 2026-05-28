@@ -13,6 +13,8 @@ explicit user-triggered meal cancellation service.
 - Today/tomorrow menu and meal status sensors.
 - Refund, unpaid amount, order status, and next-order-opening sensors when
   StartEdu exposes those values.
+- Main-device synchronization status sensors for the current refresh activity,
+  last refresh result, and last refresh timestamp.
 - Food and cancellation availability binary sensors.
 - `button.<entry>_refresh_startedu_data` for manual user-triggered refresh.
 - `startedu.cancel_meal` service for explicit whole-day cancellation.

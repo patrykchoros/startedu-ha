@@ -27,6 +27,7 @@ from custom_components.startedu.entity_model import (
     meal_public_attributes,
     meal_time_window,
     next_child_meal,
+    normalize_meal_label,
     normalize_menu_text,
 )
 from custom_components.startedu.models import (
@@ -97,6 +98,20 @@ class EntityModelTests(unittest.TestCase):
             normalize_menu_text("Ryż BIO z warzywami."),
             "Ryż BIO z warzywami.",
         )
+        self.assertEqual(
+            normalize_menu_text(
+                "ŻUREK, GULASZ STAROPOLSKI, KOPYTKA, "
+                "SAŁATKA SZWEDZKA, KOMPOT / LEMONIADA"
+            ),
+            "Żurek, gulasz staropolski, kopytka, "
+            "sałatka szwedzka, kompot / lemoniada",
+        )
+        self.assertEqual(
+            normalize_menu_text("MANGO LASSI / CHRUPKI KUKURYDZIANE"),
+            "Mango lassi / chrupki kukurydziane",
+        )
+        self.assertEqual(normalize_meal_label("OBIAD"), "Obiad")
+        self.assertEqual(normalize_meal_label("podwieczorek"), "Podwieczorek")
 
     def test_cancelled_calendar_event_uses_localized_prefix(self) -> None:
         meal = StartEduMeal(
@@ -133,6 +148,45 @@ class EntityModelTests(unittest.TestCase):
         self.assertEqual(len(attributes["meal_slots"]), 2)
         self.assertNotIn("meal_id", attributes["meal_slots"][0])
         self.assertNotIn("child_id", attributes["meal_slots"][0])
+
+    def test_day_menu_state_formats_itemized_menu_sections(self) -> None:
+        child = StartEduChild(
+            child_id="CLIENT_ID_1",
+            name="CHILD_1",
+            meals=(
+                StartEduMeal(
+                    meal_id=None,
+                    date=self.today,
+                    name="OBIAD",
+                    menu=(
+                        "ŻUREK, GULASZ STAROPOLSKI, KOPYTKA, "
+                        "SAŁATKA SZWEDZKA, KOMPOT / LEMONIADA"
+                    ),
+                    meal_type="lunch",
+                    status="paid",
+                ),
+                StartEduMeal(
+                    meal_id=None,
+                    date=self.today,
+                    name="podwieczorek",
+                    menu="MANGO LASSI / CHRUPKI KUKURYDZIANE",
+                    meal_type="afternoon_snack",
+                    status="paid",
+                ),
+            ),
+        )
+
+        self.assertEqual(
+            day_menu_state(child, self.today, "pl"),
+            "Obiad: Żurek, gulasz staropolski, kopytka, "
+            "sałatka szwedzka, kompot / lemoniada; "
+            "Podwieczorek: Mango lassi / chrupki kukurydziane",
+        )
+        self.assertEqual(
+            meal_event_description(child.meals[0]),
+            "Żurek, gulasz staropolski, kopytka, "
+            "sałatka szwedzka, kompot / lemoniada",
+        )
 
     def test_next_meal_prefers_active_meals_and_exposes_public_attributes(self) -> None:
         cancelled = StartEduMeal(

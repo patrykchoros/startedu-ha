@@ -17,7 +17,9 @@ and automations clear for multi-child accounts.
 
 ```mermaid
 flowchart TD
-    entry["StartEdu config entry"] --> refresh["Diagnostic refresh button"]
+    entry["StartEdu config entry"] --> account["Main StartEdu device"]
+    account --> refresh["Diagnostic refresh button"]
+    account --> sync["Sync status sensors"]
     entry --> coordinator["Shared coordinator cache"]
     coordinator --> child["Child device"]
 
@@ -95,6 +97,17 @@ Diagnostic button:
 The refresh button requests a full StartEdu coordinator refresh for the config
 entry. It intentionally does not split current-month and next-month refreshes
 into separate user-facing actions.
+
+Main-device diagnostic sensors:
+
+- `sensor.<entry>_sync_status`
+- `sensor.<entry>_last_sync_status`
+- `sensor.<entry>_last_sync_time`
+
+`sync_status` is `waiting` or `running`. `last_sync_status` is `successful` or
+`failed` once at least one refresh attempt has finished. Both display states are
+localized to the Home Assistant language. `last_sync_time` is the timestamp of
+the last completed refresh attempt, successful or failed.
 
 Status/accounting sensors:
 

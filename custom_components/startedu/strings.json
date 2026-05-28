@@ -76,6 +76,12 @@
       "sync_status": {
         "name": "Sync status"
       },
+      "last_sync_status": {
+        "name": "Last sync status"
+      },
+      "last_sync_time": {
+        "name": "Last sync time"
+      },
       "current_month_order_status": {
         "name": "Current month order status"
       },

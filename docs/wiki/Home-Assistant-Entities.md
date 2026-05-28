@@ -7,7 +7,9 @@ Each StartEdu child is represented as a separate Home Assistant device. See
 
 ```mermaid
 flowchart TD
-    entry["StartEdu config entry"] --> refresh["Diagnostic refresh button"]
+    entry["StartEdu config entry"] --> account["Main StartEdu device"]
+    account --> refresh["Diagnostic refresh button"]
+    account --> sync["Sync status sensors"]
     entry --> coordinator["Shared coordinator cache"]
     coordinator --> child["Child device"]
 
@@ -34,6 +36,19 @@ or `ODWOŁANE: Obiad` in Polish. Event descriptions contain only normalized menu
 text. Unknown Home Assistant languages fall back to English.
 
 ## Sensors
+
+Main StartEdu device:
+
+- `sensor.<entry>_sync_status`
+- `sensor.<entry>_last_sync_status`
+- `sensor.<entry>_last_sync_time`
+
+`sync_status` shows whether a refresh is waiting or running.
+`last_sync_status` shows the result of the last completed refresh attempt.
+`last_sync_time` is updated after both successful and failed refresh attempts.
+Display states are localized to the Home Assistant language.
+
+Child devices:
 
 - `sensor.<child>_today_menu`
 - `sensor.<child>_tomorrow_menu`

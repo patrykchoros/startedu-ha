@@ -99,7 +99,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.startedu.client import CannotConnect, InvalidAuth, StartEduError
-from custom_components.startedu.coordinator import StartEduDataUpdateCoordinator
+from custom_components.startedu.coordinator import (
+    SYNC_ACTIVITY_WAITING,
+    SYNC_RESULT_FAILED,
+    SYNC_RESULT_SUCCESSFUL,
+    StartEduDataUpdateCoordinator,
+)
 from custom_components.startedu.models import (
     MEAL_STATUS_CANCELLED,
     MEAL_STATUS_PAID,
@@ -178,6 +183,13 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         result = await coordinator._async_update_data()
 
         self.assertIs(result, account_data)
+        self.assertEqual(coordinator.sync_activity, SYNC_ACTIVITY_WAITING)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_SUCCESSFUL)
+        self.assertEqual(
+            coordinator.last_sync_time,
+            datetime(2026, 5, 26, 8, 30, tzinfo=timezone.utc),
+        )
+        self.assertEqual(coordinator.listener_updates, 2)
         self.assertEqual(len(hass.tracked_points), 3)
         self.assertEqual(hass.tracked_points[-1].date(), date(2026, 6, 15))
 
@@ -195,6 +207,8 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(UpdateFailed):
             await coordinator._async_update_data()
+        self.assertEqual(coordinator.sync_activity, SYNC_ACTIVITY_WAITING)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_FAILED)
 
     async def test_startedu_downtime_becomes_update_failed(self) -> None:
         coordinator = StartEduDataUpdateCoordinator(
@@ -205,6 +219,20 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(UpdateFailed):
             await coordinator._async_update_data()
+        self.assertEqual(coordinator.sync_activity, SYNC_ACTIVITY_WAITING)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_FAILED)
+
+    async def test_startedu_timeout_becomes_update_failed(self) -> None:
+        coordinator = StartEduDataUpdateCoordinator(
+            FakeHass(),
+            FakeClient(error=TimeoutError("slow")),
+            FakeEntry(),
+        )
+
+        with self.assertRaises(UpdateFailed):
+            await coordinator._async_update_data()
+        self.assertEqual(coordinator.sync_activity, SYNC_ACTIVITY_WAITING)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_FAILED)
 
     async def test_invalid_auth_becomes_config_entry_auth_failed(self) -> None:
         coordinator = StartEduDataUpdateCoordinator(
@@ -215,6 +243,8 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(ConfigEntryAuthFailed):
             await coordinator._async_update_data()
+        self.assertEqual(coordinator.sync_activity, SYNC_ACTIVITY_WAITING)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_FAILED)
 
     async def test_empty_schedule_is_valid_account_data(self) -> None:
         account_data = StartEduAccountData(
