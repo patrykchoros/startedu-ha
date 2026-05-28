@@ -282,23 +282,23 @@ class StartEduClient:
 
         for child_link in child_links:
             child_dashboard_html = dashboard_html
-            if not child_link.is_active and child_link.path:
+            if child_link.path:
+                switch_referer = dashboard_url
                 await self._request_text(
                     "get",
                     urljoin(self._base_url, child_link.path),
-                    headers={"Referer": dashboard_url},
+                    headers={"Referer": switch_referer},
                 )
                 self._adopt_response_base_url()
+                switch_response_url = _metadata_raw_url(
+                    self._last_response_metadata,
+                    switch_referer,
+                )
                 dashboard_url = urljoin(self._base_url, "/Home/Client")
                 child_dashboard_html = await self._request_text(
                     "get",
                     dashboard_url,
-                    headers={
-                        "Referer": _metadata_raw_url(
-                            self._last_response_metadata,
-                            dashboard_url,
-                        )
-                    },
+                    headers={"Referer": switch_response_url},
                 )
                 self._adopt_response_base_url()
                 dashboard_url = urljoin(self._base_url, "/Home/Client")
@@ -391,19 +391,17 @@ class StartEduClient:
                 _meal_date_range(children),
             )
 
+        known_refunds = tuple(
+            child.refund_available
+            for child in children
+            if child.refund_available is not None
+        )
         return StartEduAccountData(
             fetched_at=fetched_at,
             children=tuple(children),
             active_child_id=first_dashboard.active_child_id,
             meals=tuple(meal for child in children for meal in child.meals),
-            refunds=next(
-                (
-                    child.refund_available
-                    for child in children
-                    if child.refund_available
-                ),
-                None,
-            ),
+            refunds=sum(known_refunds, Decimal("0")) if known_refunds else None,
         )
 
     async def _request_text(self, method: str, url: str, **kwargs: Any) -> str:
@@ -852,7 +850,13 @@ def parse_refunds_html(html: str) -> Decimal | None:
     match = re.search(r"Aktualnie\s+" + MONEY_RE, _strip_accents(text), re.IGNORECASE)
     if match:
         return _parse_decimal(match.group(1))
-    return _extract_money_near_label(text, ("zwroty", "refund"))
+    refunds = _extract_money_near_label(text, ("zwroty", "refund"))
+    if refunds is not None:
+        return refunds
+    normalized = _strip_accents(text).casefold()
+    if "zwrot" in normalized or "refund" in normalized:
+        return Decimal("0")
+    return None
 
 
 def parse_commitments_html(html: str) -> Decimal | None:

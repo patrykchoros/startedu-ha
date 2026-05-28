@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from homeassistant.components.button import ButtonEntity
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -19,10 +19,8 @@ from .entity_model import can_cancel
 from .models import StartEduChild
 
 
-@dataclass(frozen=True, slots=True)
-class StartEduCancelMealButtonDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class StartEduCancelMealButtonDescription(ButtonEntityDescription):
     offset_days: int
 
 

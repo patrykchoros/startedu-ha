@@ -278,9 +278,13 @@ def _session_for_cancel(
     return _FakeSession(
         get_responses=[
             _TextResponse(DASHBOARD_HTML),
+            _TextResponse("<html></html>"),
+            _TextResponse(DASHBOARD_HTML),
             _TextResponse(_pre_cancel_order_html()),
             _TextResponse(REFUNDS_HTML),
             _TextResponse(COMMITMENTS_HTML),
+            _TextResponse(DASHBOARD_HTML),
+            _TextResponse("<html></html>"),
             _TextResponse(DASHBOARD_HTML),
             _TextResponse(post_order_html or _post_cancel_order_html()),
             _TextResponse(REFUNDS_HTML),

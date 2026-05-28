@@ -90,6 +90,7 @@ def install_homeassistant_stubs(
 
     button = _module("homeassistant.components.button")
     button.ButtonEntity = ButtonEntity
+    button.ButtonEntityDescription = ButtonEntityDescription
 
 
 def _install_custom_component_packages() -> None:
@@ -301,6 +302,16 @@ class BinarySensorEntity:
 
 class ButtonEntity:
     pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class ButtonEntityDescription:
+    key: str
+    translation_key: str | None = None
+    device_class: str | None = None
+    entity_category: str | None = None
+    entity_registry_enabled_default: bool = True
+    translation_placeholders: dict[str, str] | None = None
 
 
 class ServiceCall:
