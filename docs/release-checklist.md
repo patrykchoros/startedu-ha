@@ -52,7 +52,8 @@ The policy behind this checklist is documented in
 - Manually install through HACS as a custom repository in a Home Assistant test
   instance.
 - Add the integration from the Home Assistant UI and confirm config flow,
-  entities, refresh button, and `startedu.cancel_meal` service registration.
+  entities, refresh button, child cancellation buttons, and
+  `startedu.cancel_meal` service registration.
 
 ## Publication
 

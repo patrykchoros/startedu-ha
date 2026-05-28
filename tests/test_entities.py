@@ -9,7 +9,10 @@ from ha_stubs import install_homeassistant_stubs
 
 install_homeassistant_stubs()
 
-from custom_components.startedu import binary_sensor, calendar, sensor
+from homeassistant.exceptions import HomeAssistantError
+
+from custom_components.startedu import binary_sensor, button, calendar, sensor
+from custom_components.startedu.client import MealCancellationNotAllowed
 from custom_components.startedu.const import CONF_LUNCH_TIME, DOMAIN
 from custom_components.startedu.models import (
     MEAL_STATUS_CANCELLED,
@@ -37,6 +40,17 @@ class FakeCoordinator:
         self.sync_activity = "waiting"
         self.last_sync_status = "successful"
         self.last_sync_time = datetime(2026, 5, 26, 8, 15, tzinfo=timezone.utc)
+        self.cancel_calls: list[tuple[str, date]] = []
+        self.cancel_error: Exception | None = None
+        self.refresh_calls = 0
+
+    async def async_cancel_meal(self, child_id: str, target_date: date) -> None:
+        if self.cancel_error is not None:
+            raise self.cancel_error
+        self.cancel_calls.append((child_id, target_date))
+
+    async def async_request_refresh(self) -> None:
+        self.refresh_calls += 1
 
 
 class EntityTests(unittest.IsolatedAsyncioTestCase):
@@ -220,6 +234,100 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
             _entity_by_key(entities, "next_month_ordering_available").is_on
         )
 
+    async def test_button_setup_exposes_refresh_and_cancel_buttons(self) -> None:
+        child = _child_with_meals()
+        entry = FakeConfigEntry()
+        coordinator = FakeCoordinator(_account_data(child), entry)
+        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: coordinator}})
+        entities = []
+
+        await button.async_setup_entry(hass, entry, entities.extend)
+
+        self.assertEqual(
+            len(entities),
+            1 + len(button.CANCEL_MEAL_BUTTON_DESCRIPTIONS),
+        )
+        refresh = _entity_by_translation_key(entities, "refresh_startedu_data")
+        cancel_today = _entity_by_key(entities, "cancel_today_meals")
+        cancel_tomorrow = _entity_by_key(entities, "cancel_tomorrow_meals")
+
+        self.assertTrue(cancel_today.available)
+        self.assertFalse(cancel_tomorrow.available)
+
+        await refresh.async_press()
+        await cancel_today.async_press()
+
+        self.assertEqual(coordinator.refresh_calls, 1)
+        self.assertEqual(
+            coordinator.cancel_calls,
+            [("CHILD-ID-1", date(2026, 5, 26))],
+        )
+
+        coordinator.data = _account_data(_child_after_refresh())
+
+        self.assertFalse(cancel_today.available)
+        with self.assertRaises(HomeAssistantError):
+            await cancel_today.async_press()
+
+    async def test_cancel_button_wraps_stale_startedu_rejection(self) -> None:
+        child = _child_with_meals()
+        entry = FakeConfigEntry()
+        coordinator = FakeCoordinator(_account_data(child), entry)
+        coordinator.cancel_error = MealCancellationNotAllowed("missing_cancel_action")
+        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: coordinator}})
+        entities = []
+
+        await button.async_setup_entry(hass, entry, entities.extend)
+
+        cancel_today = _entity_by_key(entities, "cancel_today_meals")
+        self.assertTrue(cancel_today.available)
+        with self.assertRaises(HomeAssistantError):
+            await cancel_today.async_press()
+
+    async def test_cancel_buttons_are_isolated_per_child(self) -> None:
+        first = _child_with_meals()
+        second = StartEduChild(
+            child_id="CHILD-ID-2",
+            name="Child 2",
+            meals=(
+                StartEduMeal(
+                    meal_id="MEAL-26-LUNCH-2",
+                    date=date(2026, 5, 26),
+                    name="Obiad",
+                    meal_type=MEAL_TYPE_LUNCH,
+                    child_id="CHILD-ID-2",
+                    child_name="Child 2",
+                    status=MEAL_STATUS_PAID,
+                    can_cancel=True,
+                ),
+            ),
+        )
+        entry = FakeConfigEntry()
+        coordinator = FakeCoordinator(
+            StartEduAccountData(
+                fetched_at=datetime(2026, 5, 26, 7, 0, tzinfo=timezone.utc),
+                children=(first, second),
+            ),
+            entry,
+        )
+        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: coordinator}})
+        entities = []
+
+        await button.async_setup_entry(hass, entry, entities.extend)
+
+        self.assertEqual(5, len(entities))
+        second_today = _entity_by_unique_id(
+            entities,
+            "entry-id_CHILD-ID-2_cancel_today_meals",
+        )
+
+        await second_today.async_press()
+
+        self.assertEqual(
+            coordinator.cancel_calls,
+            [("CHILD-ID-2", date(2026, 5, 26))],
+        )
+
     async def test_multi_child_sensor_setup_creates_entities_per_child(self) -> None:
         first = _child_with_meals()
         second = StartEduChild(child_id="CHILD-ID-2", name="Child 2", meals=())
@@ -360,4 +468,20 @@ def _account_data(child: StartEduChild) -> StartEduAccountData:
 
 
 def _entity_by_key(entities: list[object], key: str):
-    return next(entity for entity in entities if entity.entity_description.key == key)
+    return next(
+        entity
+        for entity in entities
+        if getattr(getattr(entity, "entity_description", None), "key", None) == key
+    )
+
+
+def _entity_by_unique_id(entities: list[object], unique_id: str):
+    return next(entity for entity in entities if entity._attr_unique_id == unique_id)
+
+
+def _entity_by_translation_key(entities: list[object], translation_key: str):
+    return next(
+        entity
+        for entity in entities
+        if getattr(entity, "_attr_translation_key", None) == translation_key
+    )

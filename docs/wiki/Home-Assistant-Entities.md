@@ -17,12 +17,14 @@ flowchart TD
     child --> menu["Menu sensors"]
     child --> status["Status and accounting sensors"]
     child --> binary["Food and cancellation binary sensors"]
+    child --> actions["Cancellation buttons"]
 
     calendar --> cal_entity["calendar.<child>_meals"]
     menu --> day_menu["today/tomorrow menu sensors"]
     status --> order_state["order, refund, unpaid, update sensors"]
     binary --> food["has_food today/tomorrow"]
     binary --> can_cancel["can_cancel today/tomorrow"]
+    actions --> cancel_buttons["cancel today/tomorrow meals"]
 ```
 
 ## Calendar
@@ -76,10 +78,18 @@ StartEdu HTML, cookies, credentials, and internal child/meal identifiers.
 ## Buttons
 
 - `button.<entry>_refresh_startedu_data`
+- `button.<child>_cancel_today_meals`
+- `button.<child>_cancel_tomorrow_meals`
 
 The refresh button is diagnostic and user-triggered. It requests a full StartEdu
 coordinator refresh for the configured account rather than refreshing current
 and next-month data separately.
+
+The child-device cancellation buttons cancel the whole daily meal set for the
+selected child and local day. They are available only when the current
+coordinator data says that today's or tomorrow's meal can be cancelled. Pressing
+one still runs the guarded StartEdu flow with a fresh pre-refresh and
+post-confirmation.
 
 Entity names may vary based on Home Assistant's entity registry and translation
 handling.
@@ -113,6 +123,6 @@ flowchart TD
     cache --> entities["Entities update from\nconfirmed snapshot"]
 ```
 
-Potentially friendlier service targeting is tracked in issue #23. Entity buttons
-for today/tomorrow cancellation should remain out of scope unless a separate
-safety design proves they are appropriate.
+Home Assistant button entities do not provide a native confirmation prompt
+before `button.press`. Safety therefore comes from clear naming, availability
+state, fresh pre-validation, and post-refresh confirmation.
