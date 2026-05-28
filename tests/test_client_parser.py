@@ -248,6 +248,7 @@ class StartEduClientParserTests(unittest.TestCase):
                   <li>GULASZ STAROPOLSKI</li>
                   <li>KOPYTKA</li>
                   <li>SAŁATKA SZWEDZKA</li>
+                  <li>tarty SER / słupki warzywne</li>
                   <li>KOMPOT / LEMONIADA</li>
                 </ul>
                 <li class="title">podwieczorek</li>
@@ -263,7 +264,7 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertEqual(
             meals[0].menu,
             "ŻUREK, GULASZ STAROPOLSKI, KOPYTKA, SAŁATKA SZWEDZKA, "
-            "KOMPOT / LEMONIADA",
+            "tarty SER / słupki warzywne, KOMPOT / LEMONIADA",
         )
         self.assertEqual(meals[1].menu, "MANGO LASSI / CHRUPKI KUKURYDZIANE")
 

@@ -5,6 +5,7 @@ integration.
 
 ## Pages
 
+- [User Guide](User-Guide)
 - [Development Setup](Development-Setup)
 - [StartEdu Data Model](StartEdu-Data-Model)
 - [Home Assistant Entities](Home-Assistant-Entities)
@@ -33,13 +34,6 @@ The current MVP is read-mostly:
 Current future work is tracked in GitHub issues rather than in a separate wiki
 roadmap:
 
-- [#21 User documentation][issue-21]
-- [#22 HACS smoke test and v0.1.0 release][issue-22]
-- [#23 Cancellation service targeting UX][issue-23]
+- [Open GitHub issues][issues]
 
-The user-facing guide is intentionally tracked as issue #21 because this wiki is
-currently maintainer-oriented.
-
-[issue-21]: https://github.com/patrykchoros/startedu-ha/issues/21
-[issue-22]: https://github.com/patrykchoros/startedu-ha/issues/22
-[issue-23]: https://github.com/patrykchoros/startedu-ha/issues/23
+[issues]: https://github.com/patrykchoros/startedu-ha/issues
