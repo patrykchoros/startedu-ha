@@ -56,8 +56,8 @@ values by default.
    development config.
 2. Restart Home Assistant.
 3. Add the StartEdu integration from the UI.
-4. Confirm the calendar, sensors, refresh button, and `startedu.cancel_meal`
-   service are available.
+4. Confirm the calendar, sensors, refresh button, child cancellation buttons,
+   and `startedu.cancel_meal` service are available.
 
 Never store real credentials, cookies, or captured authenticated pages in this
 repository.

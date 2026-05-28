@@ -18,6 +18,7 @@ flowchart TD
     opening["next_order_opening_date"] --> full
     manual["Refresh button"] --> full
 
+    cancel_buttons["Child cancellation buttons"] --> mutation
     cancel["startedu.cancel_meal"] --> mutation
     mutation["Mutating StartEdu request\nwith post-refresh confirmation"] --> publish
 

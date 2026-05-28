@@ -118,6 +118,12 @@
     "button": {
       "refresh_startedu_data": {
         "name": "Refresh StartEdu data"
+      },
+      "cancel_today_meals": {
+        "name": "Cancel today's meals"
+      },
+      "cancel_tomorrow_meals": {
+        "name": "Cancel tomorrow's meals"
       }
     }
   }

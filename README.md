@@ -17,6 +17,7 @@ explicit user-triggered meal cancellation service.
   last refresh result, and last refresh timestamp.
 - Food and cancellation availability binary sensors.
 - `button.<entry>_refresh_startedu_data` for manual user-triggered refresh.
+- Child-device buttons for cancelling today's or tomorrow's whole-day meals.
 - `startedu.cancel_meal` service for explicit whole-day cancellation.
 
 ## Installation
@@ -56,7 +57,8 @@ not published as a default HACS repository yet.
   account.
 - Read-only entity model: implemented for calendar, sensors, binary sensors,
   and manual refresh.
-- Meal cancellation action: implemented as an explicit service call.
+- Meal cancellation action: implemented as child-device buttons and an explicit
+  service call.
 
 Before public distribution or broader Home Assistant testing, follow the
 [release process](docs/release-process.md), the

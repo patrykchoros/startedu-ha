@@ -27,12 +27,14 @@ flowchart TD
     child --> menu["Menu sensors"]
     child --> status["Status and accounting sensors"]
     child --> binary["Food and cancellation binary sensors"]
+    child --> actions["Cancellation buttons"]
 
     calendar --> cal_entity["calendar.<child>_meals"]
     menu --> day_menu["today/tomorrow menu sensors"]
     status --> order_state["order, refund, unpaid, update sensors"]
     binary --> food["has_food today/tomorrow"]
     binary --> can_cancel["can_cancel today/tomorrow"]
+    actions --> cancel_buttons["cancel today/tomorrow meals"]
 ```
 
 ## Calendar
@@ -109,6 +111,16 @@ Main-device diagnostic sensors:
 localized to the Home Assistant language. `last_sync_time` is the timestamp of
 the last completed refresh attempt, successful or failed.
 
+Child cancellation buttons:
+
+- `button.<child>_cancel_today_meals`
+- `button.<child>_cancel_tomorrow_meals`
+
+The cancellation buttons are available only when the matching local day is
+currently cancellable in the coordinator snapshot. Pressing a button still runs
+the guarded cancellation flow with a fresh StartEdu pre-refresh and
+post-confirmation before any new data is published.
+
 Status/accounting sensors:
 
 - `sensor.<child>_today_meal_status`
@@ -157,8 +169,9 @@ in attributes.
 
 ## Cancellation Service
 
-Whole-day cancellation is exposed only through an explicit user-triggered Home
-Assistant service, not through automatic behavior or entity buttons.
+Whole-day cancellation is exposed through explicit user-triggered Home Assistant
+actions: child-device buttons for today/tomorrow and the advanced service for a
+specific child/date.
 
 Service:
 
@@ -203,6 +216,6 @@ flowchart TD
     cache --> entities["Entities update from\nconfirmed snapshot"]
 ```
 
-Buttons such as `button.<child>_cancel_today_meal` may be considered later, but
-they should not be the first implementation because accidental activation risk
-is higher than for an explicit service call.
+Home Assistant button entities do not provide a native confirmation prompt
+before `button.press`. Safety therefore comes from clear naming, availability
+state, fresh pre-validation, and post-refresh confirmation.

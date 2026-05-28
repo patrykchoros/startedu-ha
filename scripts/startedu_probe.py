@@ -220,9 +220,10 @@ def build_entity_report(
         "meal_date_range": _meal_date_range(children),
         "expected_entities": {
             "account": 4,
-            "per_child": 16,
+            "per_child": 18,
             "sensor_per_child": 10,
             "binary_sensor_per_child": 5,
+            "button_per_child": 2,
             "calendar_per_child": 1,
         },
         "account_entities": {
@@ -296,7 +297,7 @@ def _child_entity_report(
     calendar_entries = calendar_meals(child)
     return {
         "index": index,
-        "entity_count": 16,
+        "entity_count": 18,
         "meal_count": len(child.meals),
         "sensors": {
             "today_menu": _menu_entity(child, today),
@@ -320,6 +321,10 @@ def _child_entity_report(
             "can_cancel_today_meal": can_cancel(child, today),
             "can_cancel_tomorrow_meal": can_cancel(child, tomorrow),
             "next_month_ordering_available": child.next_month_ordering_available,
+        },
+        "buttons": {
+            "cancel_today_meals": can_cancel(child, today),
+            "cancel_tomorrow_meals": can_cancel(child, tomorrow),
         },
         "calendar": {
             "meals": {
@@ -494,6 +499,7 @@ def format_entity_report(report: dict[str, Any]) -> str:
             f"per_child={expected['per_child']} "
             f"(sensor={expected['sensor_per_child']}, "
             f"binary_sensor={expected['binary_sensor_per_child']}, "
+            f"button={expected['button_per_child']}, "
             f"calendar={expected['calendar_per_child']})"
         ),
         "account.refresh_startedu_data: available=True source=coordinator_refresh",
@@ -507,6 +513,7 @@ def format_entity_report(report: dict[str, Any]) -> str:
     for child in report["children"]:
         sensors = child["sensors"]
         binary_sensors = child["binary_sensors"]
+        buttons = child["buttons"]
         calendar = child["calendar"]["meals"]
         lines.extend(
             [
@@ -542,6 +549,11 @@ def format_entity_report(report: dict[str, Any]) -> str:
                     f"has_food_tomorrow={binary_sensors['has_food_tomorrow']} "
                     f"can_cancel_today={binary_sensors['can_cancel_today_meal']} "
                     f"can_cancel_tomorrow={binary_sensors['can_cancel_tomorrow_meal']}"
+                ),
+                (
+                    "cancel_buttons: "
+                    f"today_available={buttons['cancel_today_meals']} "
+                    f"tomorrow_available={buttons['cancel_tomorrow_meals']}"
                 ),
                 f"calendar.next_event: {_format_calendar_event(calendar['next_event'])}",
             ]

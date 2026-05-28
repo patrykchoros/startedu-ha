@@ -106,18 +106,21 @@ class StartEduProbeTests(unittest.TestCase):
         serialized = json.dumps(report, ensure_ascii=False)
         child = report["children"][0]
 
-        self.assertEqual(report["expected_entities"]["per_child"], 16)
+        self.assertEqual(report["expected_entities"]["per_child"], 18)
+        self.assertEqual(report["expected_entities"]["button_per_child"], 2)
         self.assertEqual(report["expected_entities"]["account"], 4)
         self.assertIn("sync_status", report["account_entities"])
         self.assertIn("last_sync_status", report["account_entities"])
         self.assertIn("last_sync_time", report["account_entities"])
-        self.assertEqual(child["entity_count"], 16)
+        self.assertEqual(child["entity_count"], 18)
         self.assertTrue(child["sensors"]["today_menu"]["state_present"])
         self.assertEqual(child["sensors"]["today_menu"]["meal_slots"], 1)
         self.assertTrue(child["binary_sensors"]["has_food_today"])
+        self.assertTrue(child["buttons"]["cancel_today_meals"])
         self.assertEqual(child["calendar"]["meals"]["events"], 1)
-        self.assertIn("expected_entities: account=4 per_child=16", formatted)
+        self.assertIn("expected_entities: account=4 per_child=18", formatted)
         self.assertIn("account.sync_status: available=True", formatted)
+        self.assertIn("cancel_buttons: today_available=True", formatted)
 
         for secret in (
             "SECRET_CHILD_ID_1",

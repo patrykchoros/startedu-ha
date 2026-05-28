@@ -25,7 +25,8 @@ The current MVP is read-mostly:
 - Sensors for day menus, account values when available, and synchronization
   health.
 - A UI config flow for credentials and polling options.
-- An explicit `startedu.cancel_meal` service for whole-day cancellation.
+- Child-device buttons and an explicit `startedu.cancel_meal` service for
+  whole-day cancellation.
 
 ## Backlog
 
