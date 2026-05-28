@@ -37,6 +37,11 @@ class StartEduSensorDescription(SensorEntityDescription):
     ) = None
 
 
+@dataclass(frozen=True, kw_only=True)
+class StartEduAccountSensorDescription(SensorEntityDescription):
+    value_fn: Callable[[StartEduDataUpdateCoordinator], Any]
+
+
 def _target_date(coordinator: StartEduDataUpdateCoordinator, offset_days: int) -> date:
     return dt_util.now().date() + timedelta(days=offset_days)
 
@@ -131,6 +136,18 @@ def _next_order_opening_date_value(
     return child.next_order_opening_date
 
 
+def _sync_status_value(coordinator: StartEduDataUpdateCoordinator) -> str | None:
+    return status_label(coordinator.sync_activity, _hass_language(coordinator))
+
+
+def _last_sync_status_value(coordinator: StartEduDataUpdateCoordinator) -> str | None:
+    return status_label(coordinator.last_sync_status, _hass_language(coordinator))
+
+
+def _last_sync_time_value(coordinator: StartEduDataUpdateCoordinator) -> datetime | None:
+    return coordinator.last_sync_time
+
+
 def _today_menu_attributes(
     child: StartEduChild,
     coordinator: StartEduDataUpdateCoordinator,
@@ -223,6 +240,29 @@ SENSOR_DESCRIPTIONS: tuple[StartEduSensorDescription, ...] = (
 )
 
 
+ACCOUNT_SENSOR_DESCRIPTIONS: tuple[StartEduAccountSensorDescription, ...] = (
+    StartEduAccountSensorDescription(
+        key="sync_status",
+        translation_key="sync_status",
+        value_fn=_sync_status_value,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    StartEduAccountSensorDescription(
+        key="last_sync_status",
+        translation_key="last_sync_status",
+        value_fn=_last_sync_status_value,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    StartEduAccountSensorDescription(
+        key="last_sync_time",
+        translation_key="last_sync_time",
+        value_fn=_last_sync_time_value,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -230,13 +270,37 @@ async def async_setup_entry(
 ) -> None:
     coordinator: StartEduDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     children = coordinator.data.child_accounts if coordinator.data else ()
-    async_add_entities(
-        [
-            StartEduSensor(coordinator, entry, child, description)
-            for child in children
-            for description in SENSOR_DESCRIPTIONS
-        ]
-    )
+    account_entities = [
+        StartEduAccountSensor(coordinator, entry, description)
+        for description in ACCOUNT_SENSOR_DESCRIPTIONS
+    ]
+    child_entities = [
+        StartEduSensor(coordinator, entry, child, description)
+        for child in children
+        for description in SENSOR_DESCRIPTIONS
+    ]
+    async_add_entities([*account_entities, *child_entities])
+
+
+class StartEduAccountSensor(StartEduEntity, SensorEntity):
+    """Sensor exposing StartEdu synchronization state for the main device."""
+
+    def __init__(
+        self,
+        coordinator: StartEduDataUpdateCoordinator,
+        entry: ConfigEntry,
+        description: StartEduAccountSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self.entity_description = description
+        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_translation_key = description.translation_key
+        self._attr_device_class = description.device_class
+        self._attr_entity_category = description.entity_category
+
+    @property
+    def native_value(self) -> Any:
+        return self.entity_description.value_fn(self.coordinator)
 
 
 class StartEduSensor(StartEduEntity, SensorEntity):

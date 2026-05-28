@@ -76,6 +76,12 @@
       "sync_status": {
         "name": "Status synchronizacji"
       },
+      "last_sync_status": {
+        "name": "Ostatni wynik synchronizacji"
+      },
+      "last_sync_time": {
+        "name": "Czas ostatniej synchronizacji"
+      },
       "current_month_order_status": {
         "name": "Status zamówienia na bieżący miesiąc"
       },

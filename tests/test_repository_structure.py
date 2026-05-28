@@ -53,6 +53,15 @@ class RepositoryStructureTests(unittest.TestCase):
         self.assertTrue(Path("custom_components/startedu/manifest.json").exists())
         self.assertTrue(Path("custom_components/startedu/__init__.py").exists())
 
+    def test_home_assistant_brand_images_present(self) -> None:
+        for asset in (
+            Path("custom_components/startedu/brand/icon.png"),
+            Path("custom_components/startedu/brand/logo.png"),
+        ):
+            with self.subTest(asset=asset):
+                self.assertTrue(asset.exists())
+                self.assertEqual(asset.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+
     def test_installation_docs_and_release_checklist_present(self) -> None:
         readme = Path("README.md").read_text(encoding="utf-8")
         process = Path("docs/release-process.md").read_text(encoding="utf-8")

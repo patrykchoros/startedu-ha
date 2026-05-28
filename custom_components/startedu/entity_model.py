@@ -80,6 +80,13 @@ def meal_type_from_label(label: str) -> str:
     return MEAL_TYPE_OTHER
 
 
+def normalize_meal_label(value: str) -> str:
+    compact = re.sub(r"\s+", " ", value).strip()
+    if not compact:
+        return compact
+    return " ".join(_normalize_label_word(word) for word in compact.split(" "))
+
+
 def meal_time_window(meal: StartEduMeal, options: dict[str, Any]) -> MealTimeWindow:
     option_key, default_value, duration_minutes = MEAL_TIME_OPTIONS.get(
         meal.meal_type,
@@ -113,9 +120,10 @@ def next_child_meal(child: StartEduChild, today: date) -> StartEduMeal | None:
 
 
 def meal_event_summary(meal: StartEduMeal, language: str | None = None) -> str:
+    meal_name = normalize_meal_label(meal.name)
     if meal.is_cancelled:
-        return cancelled_meal_summary(meal.name, language)
-    return meal.name
+        return cancelled_meal_summary(meal_name, language)
+    return meal_name
 
 
 def meal_event_description(meal: StartEduMeal) -> str | None:
@@ -216,7 +224,7 @@ def meal_public_attributes(
 ) -> dict[str, Any]:
     attributes: dict[str, Any] = {
         "date": meal.date.isoformat(),
-        "name": meal.name,
+        "name": normalize_meal_label(meal.name),
         "meal_type": meal.meal_type,
         "can_cancel": meal.can_cancel,
         "is_cancelled": meal.is_cancelled,
@@ -298,6 +306,12 @@ def _normalize_menu_word(word: str, sentence_start: bool) -> tuple[str, bool]:
 
 def _is_short_acronym(word: str) -> bool:
     return word.isupper() and 1 < len(word) <= 3
+
+
+def _normalize_label_word(word: str) -> str:
+    if _is_short_acronym(word):
+        return word
+    return f"{word[:1].upper()}{word[1:].lower()}" if word else word
 
 
 def _strip_accents(value: str) -> str:

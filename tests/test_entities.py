@@ -34,6 +34,9 @@ class FakeCoordinator:
         self.data = data
         self.entry = entry
         self.hass = None
+        self.sync_activity = "waiting"
+        self.last_sync_status = "successful"
+        self.last_sync_time = datetime(2026, 5, 26, 8, 15, tzinfo=timezone.utc)
 
 
 class EntityTests(unittest.IsolatedAsyncioTestCase):
@@ -97,7 +100,10 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
 
         await sensor.async_setup_entry(hass, entry, entities.extend)
 
-        self.assertEqual(len(entities), len(sensor.SENSOR_DESCRIPTIONS))
+        self.assertEqual(
+            len(entities),
+            len(sensor.ACCOUNT_SENSOR_DESCRIPTIONS) + len(sensor.SENSOR_DESCRIPTIONS),
+        )
         self.assertTrue(
             all(
                 entity.entity_description.translation_placeholders is None
@@ -112,6 +118,9 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         today_menu = _entity_by_key(entities, "today_menu")
+        sync_status = _entity_by_key(entities, "sync_status")
+        last_sync_status = _entity_by_key(entities, "last_sync_status")
+        last_sync_time = _entity_by_key(entities, "last_sync_time")
         today_status = _entity_by_key(entities, "today_meal_status")
         tomorrow_status = _entity_by_key(entities, "tomorrow_meal_status")
         last_update = _entity_by_key(entities, "last_successful_update")
@@ -124,6 +133,12 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             today_menu.native_value,
             "Obiad: Rosół. Kotlet. Kompot.; Podwieczorek: Jabłko.",
+        )
+        self.assertEqual(sync_status.native_value, "oczekuje")
+        self.assertEqual(last_sync_status.native_value, "udane")
+        self.assertEqual(
+            last_sync_time.native_value,
+            datetime(2026, 5, 26, 8, 15, tzinfo=timezone.utc),
         )
         self.assertEqual(today_status.native_value, "opłacone")
         self.assertEqual(tomorrow_status.native_value, "odwołane")
@@ -153,7 +168,11 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attributes["meal_slots"][0]["status_code"], MEAL_STATUS_PAID)
 
         coordinator.data = _account_data(_child_after_refresh())
+        coordinator.sync_activity = "running"
+        coordinator.last_sync_status = "failed"
 
+        self.assertEqual(sync_status.native_value, "w toku")
+        self.assertEqual(last_sync_status.native_value, "nieudane")
         self.assertEqual(today_status.native_value, "odwołane")
         self.assertEqual(today_menu.extra_state_attributes["status"], "odwołane")
         self.assertEqual(
@@ -217,7 +236,11 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
 
         await sensor.async_setup_entry(hass, entry, entities.extend)
 
-        self.assertEqual(len(entities), 2 * len(sensor.SENSOR_DESCRIPTIONS))
+        self.assertEqual(
+            len(entities),
+            len(sensor.ACCOUNT_SENSOR_DESCRIPTIONS)
+            + 2 * len(sensor.SENSOR_DESCRIPTIONS),
+        )
         self.assertFalse(
             any(entity.entity_description.key == "next_meal" for entity in entities)
         )

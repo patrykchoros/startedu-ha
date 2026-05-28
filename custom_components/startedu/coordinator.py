@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -26,6 +26,11 @@ from .sync import (
 
 _LOGGER = logging.getLogger(__name__)
 
+SYNC_ACTIVITY_WAITING = "waiting"
+SYNC_ACTIVITY_RUNNING = "running"
+SYNC_RESULT_SUCCESSFUL = "successful"
+SYNC_RESULT_FAILED = "failed"
+
 
 class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
     """Coordinates StartEdu polling for all entities."""
@@ -47,6 +52,9 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
         self._day_rollover_unsub: CALLBACK_TYPE | None = None
         self._month_rollover_unsub: CALLBACK_TYPE | None = None
         self._next_order_opening_unsub: CALLBACK_TYPE | None = None
+        self.sync_activity = SYNC_ACTIVITY_WAITING
+        self.last_sync_status: str | None = None
+        self.last_sync_time: datetime | None = None
         self._schedule_day_rollover()
         self._schedule_month_rollover()
         entry.async_on_unload(self.cancel_scheduled_refreshes)
@@ -141,14 +149,34 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
         self.hass.async_create_task(self.async_request_refresh())
 
     async def _async_update_data(self) -> StartEduAccountData:
+        self._mark_sync_running()
         try:
             async with asyncio.timeout(30):
                 data = await self.client.async_get_account_data()
                 self._schedule_next_order_opening_refresh(data)
-                return data
         except InvalidAuth as err:
+            self._mark_sync_finished(SYNC_RESULT_FAILED)
             raise ConfigEntryAuthFailed from err
         except CannotConnect as err:
+            self._mark_sync_finished(SYNC_RESULT_FAILED)
             raise UpdateFailed(str(err)) from err
         except StartEduError as err:
+            self._mark_sync_finished(SYNC_RESULT_FAILED)
             raise UpdateFailed(str(err)) from err
+        except TimeoutError as err:
+            self._mark_sync_finished(SYNC_RESULT_FAILED)
+            raise UpdateFailed("StartEdu request timed out") from err
+        self._mark_sync_finished(SYNC_RESULT_SUCCESSFUL)
+        return data
+
+    @callback
+    def _mark_sync_running(self) -> None:
+        self.sync_activity = SYNC_ACTIVITY_RUNNING
+        self.async_update_listeners()
+
+    @callback
+    def _mark_sync_finished(self, status: str) -> None:
+        self.sync_activity = SYNC_ACTIVITY_WAITING
+        self.last_sync_status = status
+        self.last_sync_time = dt_util.now()
+        self.async_update_listeners()

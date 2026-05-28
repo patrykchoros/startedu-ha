@@ -227,11 +227,45 @@ class StartEduClientParserTests(unittest.TestCase):
 
         self.assertEqual(len(meals), 2)
         self.assertEqual(meals[0].name, "Obiad")
-        self.assertEqual(meals[0].menu, "Zupa pomidorowa Ryż z warzywami")
+        self.assertEqual(meals[0].menu, "Zupa pomidorowa, Ryż z warzywami")
         self.assertEqual(meals[1].name, "Podwieczorek")
         self.assertEqual(meals[1].menu, "Jogurt")
         self.assertTrue(all(meal.can_cancel for meal in meals))
         self.assertEqual(meals[0].price, Decimal("20.50"))
+
+    def test_parse_order_html_preserves_menu_item_boundaries_and_variants(
+        self,
+    ) -> None:
+        html = """
+        <html>
+          <body>
+            <h1>Zamówienie nr SE/ORDER_ID/5/2026 na maj 2026</h1>
+            <div class="day green" data-number="28">
+              <ul class="meal-preview">
+                <li class="title">OBIAD</li>
+                <ul>
+                  <li>ŻUREK</li>
+                  <li>GULASZ STAROPOLSKI</li>
+                  <li>KOPYTKA</li>
+                  <li>SAŁATKA SZWEDZKA</li>
+                  <li>KOMPOT / LEMONIADA</li>
+                </ul>
+                <li class="title">podwieczorek</li>
+                <ul><li>MANGO LASSI / CHRUPKI KUKURYDZIANE</li></ul>
+              </ul>
+            </div>
+          </body>
+        </html>
+        """
+
+        meals = parse_order_html(html, "CLIENT_ID_1", "CHILD_1", MEAL_STATUS_PAID)
+
+        self.assertEqual(
+            meals[0].menu,
+            "ŻUREK, GULASZ STAROPOLSKI, KOPYTKA, SAŁATKA SZWEDZKA, "
+            "KOMPOT / LEMONIADA",
+        )
+        self.assertEqual(meals[1].menu, "MANGO LASSI / CHRUPKI KUKURYDZIANE")
 
     def test_parse_order_html_uses_order_page_status(self) -> None:
         html = """
