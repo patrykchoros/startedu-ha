@@ -110,6 +110,14 @@ class EntityModelTests(unittest.TestCase):
             normalize_menu_text("MANGO LASSI / CHRUPKI KUKURYDZIANE"),
             "Mango lassi / chrupki kukurydziane",
         )
+        self.assertEqual(
+            normalize_menu_text("brokułowa, tuńczyk, tarty SER / słupki warzywne"),
+            "Brokułowa, tuńczyk, tarty ser / słupki warzywne",
+        )
+        self.assertEqual(
+            normalize_menu_text("pierogi z masełkiem NA słodko"),
+            "Pierogi z masełkiem na słodko",
+        )
         self.assertEqual(normalize_meal_label("OBIAD"), "Obiad")
         self.assertEqual(normalize_meal_label("podwieczorek"), "Podwieczorek")
 
@@ -160,7 +168,8 @@ class EntityModelTests(unittest.TestCase):
                     name="OBIAD",
                     menu=(
                         "ŻUREK, GULASZ STAROPOLSKI, KOPYTKA, "
-                        "SAŁATKA SZWEDZKA, KOMPOT / LEMONIADA"
+                        "SAŁATKA SZWEDZKA, TARTY SER / SŁUPKI WARZYWNE, "
+                        "KOMPOT / LEMONIADA"
                     ),
                     meal_type="lunch",
                     status="paid",
@@ -179,13 +188,15 @@ class EntityModelTests(unittest.TestCase):
         self.assertEqual(
             day_menu_state(child, self.today, "pl"),
             "Obiad: Żurek, gulasz staropolski, kopytka, "
-            "sałatka szwedzka, kompot / lemoniada; "
+            "sałatka szwedzka, tarty ser / słupki warzywne, "
+            "kompot / lemoniada; "
             "Podwieczorek: Mango lassi / chrupki kukurydziane",
         )
         self.assertEqual(
             meal_event_description(child.meals[0]),
             "Żurek, gulasz staropolski, kopytka, "
-            "sałatka szwedzka, kompot / lemoniada",
+            "sałatka szwedzka, tarty ser / słupki warzywne, "
+            "kompot / lemoniada",
         )
 
     def test_next_meal_prefers_active_meals_and_exposes_public_attributes(self) -> None:

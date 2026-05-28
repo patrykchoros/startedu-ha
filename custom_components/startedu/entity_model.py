@@ -37,6 +37,7 @@ from .models import (
 
 MAX_STATE_LENGTH = 255
 SAFE_MENU_STATE_LENGTH = 240
+PRESERVED_MENU_ACRONYMS = frozenset({"BBQ", "BIO", "FIT", "MSC"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,7 +291,7 @@ def normalize_menu_text(value: str) -> str:
 
 
 def _normalize_menu_word(word: str, sentence_start: bool) -> tuple[str, bool]:
-    if _is_short_acronym(word):
+    if _is_preserved_menu_acronym(word):
         return word, False
 
     if not (word.isupper() or word.islower()):
@@ -306,6 +307,10 @@ def _normalize_menu_word(word: str, sentence_start: bool) -> tuple[str, bool]:
 
 def _is_short_acronym(word: str) -> bool:
     return word.isupper() and 1 < len(word) <= 3
+
+
+def _is_preserved_menu_acronym(word: str) -> bool:
+    return word.isupper() and word in PRESERVED_MENU_ACRONYMS
 
 
 def _normalize_label_word(word: str) -> str:

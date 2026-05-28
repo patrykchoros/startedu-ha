@@ -20,6 +20,12 @@ explicit user-triggered meal cancellation service.
 - Child-device buttons for cancelling today's or tomorrow's whole-day meals.
 - `startedu.cancel_meal` service for explicit whole-day cancellation.
 
+## User Guide
+
+After the integration is installed, see the [StartEdu user guide](docs/user-guide.md)
+for entity meanings, refresh behavior, cancellation safety, dashboard examples,
+and automation examples.
+
 ## Installation
 
 This integration is prepared for installation as a HACS custom repository. It is
