@@ -27,6 +27,7 @@ from custom_components.startedu.client import (
     parse_refunds_html,
     safe_url_for_log,
 )
+from custom_components.startedu.models import MEAL_STATUS_PAID, MEAL_STATUS_UNPAID
 
 
 class StartEduClientParserTests(unittest.TestCase):
@@ -232,6 +233,24 @@ class StartEduClientParserTests(unittest.TestCase):
         self.assertTrue(all(meal.can_cancel for meal in meals))
         self.assertEqual(meals[0].price, Decimal("20.50"))
 
+    def test_parse_order_html_uses_order_page_status(self) -> None:
+        html = """
+        <html>
+          <body>
+            <h1>Zamówienie SE/ORDER_ID/6/2026 jest nieopłacone</h1>
+            <div class="day green" data-number="1">
+              <h3>Obiad</h3>
+              <p>Zupa.</p>
+            </div>
+          </body>
+        </html>
+        """
+
+        meals = parse_order_html(html, "CLIENT_ID_1", "CHILD_1", MEAL_STATUS_PAID)
+
+        self.assertEqual(len(meals), 1)
+        self.assertEqual(meals[0].status, MEAL_STATUS_UNPAID)
+
     def test_parse_refunds_and_commitments_html(self) -> None:
         refunds_html = Path("tests/fixtures/startedu_refunds_sanitized.html").read_text(
             encoding="utf-8"
@@ -350,6 +369,54 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
             "https://s1.startedu.pl/Home/Client",
         )
         self.assertIn("Mozilla/5.0", session.get_kwargs[0]["headers"]["User-Agent"])
+
+    async def test_next_month_order_status_is_inferred_from_order_pages(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(
+                    _month_order_html(order_id="CURRENT", month=5),
+                    url="https://s4.startedu.pl/Order/Show/CURRENT",
+                ),
+                _TextResponse(
+                    _month_order_html(order_id="NEXT", month=6),
+                    url="https://s4.startedu.pl/Order/Show/NEXT",
+                ),
+                _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html>Wszystkie zobowiązania są uregulowane</html>",
+                    url="https://s4.startedu.pl/Commitments",
+                ),
+            ],
+            post_responses=[],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s4.startedu.pl/Home/Client",
+        )
+        client._authenticated = True
+        client._last_html = """
+        <html>
+          <body>
+            Subkonto | CHILD_1
+            <p>Zamówienie SE/CURRENT/5/2026 zostało opłacone.</p>
+            <a href="/Order/Show/CURRENT">Wyświetl maj</a>
+            <a href="/Order/Show/NEXT">Wyświetl czerwiec</a>
+          </body>
+        </html>
+        """
+
+        data = await client.async_get_account_data()
+        child = data.children[0]
+
+        self.assertEqual(child.current_month_order_status, MEAL_STATUS_PAID)
+        self.assertEqual(child.next_month_order_status, MEAL_STATUS_PAID)
+        self.assertFalse(child.next_month_ordering_available)
+        self.assertEqual(
+            sorted({meal.date.isoformat() for meal in child.meals}),
+            ["2026-05-01", "2026-06-01"],
+        )
 
     async def test_successful_login_adopts_response_shard_host(self) -> None:
         session = _LoginSession(
@@ -510,3 +577,17 @@ def _order_html() -> str:
     return Path("tests/fixtures/startedu_order_show_sanitized.html").read_text(
         encoding="utf-8"
     )
+
+
+def _month_order_html(*, order_id: str, month: int) -> str:
+    return f"""
+    <html>
+      <body>
+        <h1>Zamówienie SE/{order_id}/{month}/2026 zostało opłacone.</h1>
+        <div class="day green" data-number="1">
+          <h3>Obiad</h3>
+          <p>Zupa.</p>
+        </div>
+      </body>
+    </html>
+    """

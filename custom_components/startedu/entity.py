@@ -25,6 +25,21 @@ class StartEduEntity(CoordinatorEntity[StartEduDataUpdateCoordinator]):
         self._child = child
 
     @property
+    def current_child(self) -> StartEduChild | None:
+        """Return this entity's child from the latest coordinator snapshot."""
+        if self._child is None or self.coordinator.data is None:
+            return self._child
+
+        return next(
+            (
+                child
+                for child in self.coordinator.data.child_accounts
+                if child.child_id == self._child.child_id
+            ),
+            self._child,
+        )
+
+    @property
     def device_info(self) -> DeviceInfo:
         if self._child is not None:
             return DeviceInfo(

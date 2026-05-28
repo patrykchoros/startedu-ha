@@ -50,7 +50,11 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
 
     @property
     def event(self) -> CalendarEvent | None:
-        meal = next_child_meal(self._child, dt_util.now().date())
+        child = self.current_child
+        if child is None:
+            return None
+
+        meal = next_child_meal(child, dt_util.now().date())
         if meal is None:
             return None
         return _meal_to_event(
@@ -68,12 +72,16 @@ class StartEduMealCalendar(StartEduEntity, CalendarEntity):
         if self.coordinator.data is None:
             return []
 
+        child = self.current_child
+        if child is None:
+            return []
+
         start = _as_datetime(start_date)
         end = _as_datetime(end_date)
         language = _hass_language(hass)
         return [
             _meal_to_event(meal, self.coordinator.entry.options, language)
-            for meal in calendar_meals(self._child)
+            for meal in calendar_meals(child)
             if _meal_starts_in_range(meal, self.coordinator.entry.options, start, end)
         ]
 

@@ -341,19 +341,38 @@ class StartEduClient:
             unpaid_amount = parse_commitments_html(
                 await self._request_text("get", urljoin(self._base_url, "/Commitments"))
             )
+            current_status = child_dashboard.current_month_order_status
+            next_status = child_dashboard.next_month_order_status
+            next_available = child_dashboard.next_month_ordering_available
+            current_year_month = _year_month_from_order_number(
+                child_dashboard.current_order_number
+            )
+            if current_year_month is None:
+                current_year_month = (fetched_at.year, fetched_at.month)
+            inferred_current_status = _infer_month_order_status(
+                meals,
+                *current_year_month,
+            )
+            if (
+                current_status == MEAL_STATUS_UNKNOWN
+                and inferred_current_status is not None
+            ):
+                current_status = inferred_current_status
+
+            next_year_month = _next_year_month(*current_year_month)
+            inferred_next_status = _infer_month_order_status(meals, *next_year_month)
+            if inferred_next_status is not None:
+                next_status = inferred_next_status
+                next_available = False
 
             children.append(
                 StartEduChild(
                     child_id=child_dashboard.active_child_id,
                     name=child_dashboard.active_child_name,
                     meals=tuple(meals),
-                    current_month_order_status=(
-                        child_dashboard.current_month_order_status
-                    ),
-                    next_month_order_status=child_dashboard.next_month_order_status,
-                    next_month_ordering_available=(
-                        child_dashboard.next_month_ordering_available
-                    ),
+                    current_month_order_status=current_status,
+                    next_month_order_status=next_status,
+                    next_month_ordering_available=next_available,
                     next_order_opening_date=child_dashboard.next_order_opening_date,
                     current_order_number=child_dashboard.current_order_number,
                     refund_available=refunds,
@@ -642,7 +661,12 @@ def parse_order_html(
     *,
     order_id: str | None = None,
 ) -> tuple[StartEduMeal, ...]:
-    order_number = _extract_order_number(html_to_text(html))
+    text = html_to_text(html)
+    order_number = _extract_order_number(text)
+    order_status = _extract_order_status(text)
+    effective_default_status = (
+        order_status if order_status != MEAL_STATUS_UNKNOWN else default_status
+    )
     year, month = _extract_order_year_month(html)
     if year is None or month is None:
         return ()
@@ -656,7 +680,11 @@ def parse_order_html(
         )
         can_cancel = _contains_cancel_meal_action(block)
         cancel_marker = "rezygnacja" in _strip_accents(day_text).casefold()
-        day_status = _status_from_day_block(classes, day_text, default_status)
+        day_status = _status_from_day_block(
+            classes,
+            day_text,
+            effective_default_status,
+        )
         raw = {
             "order_id": order_id,
             "day_number": int(day_number),
@@ -1126,11 +1154,58 @@ def _extract_order_year_month(html: str) -> tuple[int | None, int | None]:
 
 def _extract_order_status(text: str) -> str:
     normalized = _strip_accents(text).casefold()
-    if "zostalo oplacone" in normalized or "oplacone" in normalized:
-        return MEAL_STATUS_PAID
+    order_match = re.search(r"se/[a-z0-9_-]+/\d{1,2}/20\d{2}", normalized)
+    if order_match is not None:
+        start = max(0, order_match.start() - 80)
+        end = min(len(normalized), order_match.end() + 120)
+        normalized = normalized[start:end]
+
     if "nieoplacone" in normalized or "do zaplaty" in normalized:
         return MEAL_STATUS_UNPAID
+    if "zostalo oplacone" in normalized or "oplacone" in normalized:
+        return MEAL_STATUS_PAID
     return MEAL_STATUS_UNKNOWN
+
+
+def _year_month_from_order_number(order_number: str | None) -> tuple[int, int] | None:
+    if order_number is None:
+        return None
+    match = re.search(r"/(\d{1,2})/(20\d{2})$", order_number)
+    if match is None:
+        return None
+    return int(match.group(2)), int(match.group(1))
+
+
+def _next_year_month(year: int, month: int) -> tuple[int, int]:
+    if month == 12:
+        return year + 1, 1
+    return year, month + 1
+
+
+def _infer_month_order_status(
+    meals: list[StartEduMeal],
+    year: int,
+    month: int,
+) -> str | None:
+    month_meals = [
+        meal
+        for meal in meals
+        if meal.date.year == year
+        and meal.date.month == month
+        and meal.status != MEAL_STATUS_NO_SCHOOL
+    ]
+    if not month_meals:
+        return None
+    if any(meal.status == MEAL_STATUS_UNPAID for meal in month_meals):
+        return MEAL_STATUS_UNPAID
+    if any(
+        meal.status in {MEAL_STATUS_PAID, MEAL_STATUS_CANCELLED}
+        for meal in month_meals
+    ):
+        return MEAL_STATUS_PAID
+    if any(meal.status == MEAL_STATUS_NOT_ORDERED for meal in month_meals):
+        return ORDER_STATUS_AVAILABLE
+    return None
 
 
 def _status_from_day_block(classes: str, text: str, default_status: str) -> str:
