@@ -295,6 +295,11 @@ class StartEduClientParserTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertEqual(parse_refunds_html(refunds_html), Decimal("20.50"))
+        self.assertEqual(
+            parse_refunds_html("<html><body><h1>Zwroty za posiłki</h1></body></html>"),
+            Decimal("0"),
+        )
+        self.assertIsNone(parse_refunds_html("<html><body>Panel klienta</body></html>"))
         self.assertEqual(parse_commitments_html(commitments_html), Decimal("0.00"))
 
 
@@ -302,6 +307,14 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
     async def test_child_switch_refreshes_dashboard_before_order_page(self) -> None:
         session = _LoginSession(
             get_responses=[
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_1",
+                ),
+                _TextResponse(
+                    _dashboard_html(active_child=1),
+                    url="https://s4.startedu.pl/Home/Client",
+                ),
                 _TextResponse(_order_html(), url="https://s4.startedu.pl/Order/Show/1"),
                 _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
                 _TextResponse(
@@ -338,17 +351,89 @@ class StartEduLoginDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(data.children), 2)
         self.assertEqual(
-            session.get_urls[3],
+            session.get_urls[0],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_1",
+        )
+        self.assertEqual(session.get_urls[1], "https://s4.startedu.pl/Home/Client")
+        self.assertEqual(
+            session.get_urls[5],
             "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
         )
-        self.assertEqual(session.get_urls[4], "https://s4.startedu.pl/Home/Client")
+        self.assertEqual(session.get_urls[6], "https://s4.startedu.pl/Home/Client")
         self.assertEqual(
-            session.get_kwargs[4]["headers"]["Referer"],
-            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+            session.get_kwargs[1]["headers"]["Referer"],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_1",
         )
         self.assertEqual(
-            session.get_kwargs[5]["headers"]["Referer"],
+            session.get_kwargs[2]["headers"]["Referer"],
             "https://s4.startedu.pl/Home/Client",
+        )
+        self.assertEqual(
+            session.get_kwargs[6]["headers"]["Referer"],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+        )
+        self.assertEqual(
+            session.get_kwargs[7]["headers"]["Referer"],
+            "https://s4.startedu.pl/Home/Client",
+        )
+
+    async def test_initial_second_child_switches_back_before_order_page(self) -> None:
+        session = _LoginSession(
+            get_responses=[
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_1",
+                ),
+                _TextResponse(
+                    _dashboard_html(active_child=1),
+                    url="https://s4.startedu.pl/Home/Client",
+                ),
+                _TextResponse(_order_html(), url="https://s4.startedu.pl/Order/Show/1"),
+                _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/Commitments",
+                ),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+                ),
+                _TextResponse(
+                    _dashboard_html(active_child=2),
+                    url="https://s4.startedu.pl/Home/Client",
+                ),
+                _TextResponse(_order_html(), url="https://s4.startedu.pl/Order/Show/2"),
+                _TextResponse("<html></html>", url="https://s4.startedu.pl/Refunds"),
+                _TextResponse(
+                    "<html></html>",
+                    url="https://s4.startedu.pl/Commitments",
+                ),
+            ],
+            post_responses=[],
+        )
+        client = StartEduClient(
+            session,
+            "family@example.test",
+            "secret-password",
+            base_url="https://s4.startedu.pl/Home/Client",
+        )
+        client._authenticated = True
+        client._last_html = _dashboard_html(active_child=2)
+
+        data = await client.async_get_account_data()
+
+        self.assertEqual(len(data.children), 2)
+        self.assertEqual(
+            session.get_urls[0],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_1",
+        )
+        self.assertEqual(
+            session.get_urls[5],
+            "https://s4.startedu.pl/User/SwitchClient/CLIENT_ID_2",
+        )
+        self.assertEqual(
+            session.get_urls[7],
+            "https://s4.startedu.pl/Order/Show/ORDER_ID_2",
         )
 
     async def test_order_http_403_skips_order_page(self) -> None:

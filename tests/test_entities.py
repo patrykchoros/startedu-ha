@@ -251,6 +251,22 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         cancel_today = _entity_by_key(entities, "cancel_today_meals")
         cancel_tomorrow = _entity_by_key(entities, "cancel_tomorrow_meals")
 
+        self.assertEqual(
+            refresh.device_info["identifiers"],
+            {(DOMAIN, entry.entry_id)},
+        )
+        self.assertEqual(
+            cancel_today.device_info["identifiers"],
+            {(DOMAIN, entry.entry_id, child.child_id)},
+        )
+        self.assertIsInstance(
+            cancel_today.entity_description,
+            button.ButtonEntityDescription,
+        )
+        self.assertIsNone(cancel_today.entity_description.device_class)
+        self.assertIsNone(cancel_today.entity_description.entity_category)
+        self.assertIsNone(cancel_today.entity_description.translation_placeholders)
+        self.assertTrue(cancel_today.entity_description.entity_registry_enabled_default)
         self.assertTrue(cancel_today.available)
         self.assertFalse(cancel_tomorrow.available)
 
