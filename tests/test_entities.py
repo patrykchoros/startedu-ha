@@ -72,6 +72,18 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[2].description, "Naleśniki.")
         self.assertNotIn("Status:", events[0].description or "")
 
+        coordinator.data = _account_data(_child_after_refresh())
+        refreshed_events = await entities[0].async_get_events(
+            hass,
+            date(2026, 5, 26),
+            date(2026, 5, 27),
+        )
+
+        self.assertEqual(
+            [event.summary for event in refreshed_events],
+            ["ODWOŁANE: Obiad", "ODWOŁANE: Podwieczorek"],
+        )
+
     async def test_sensor_setup_exposes_state_and_attributes(self) -> None:
         child = _child_with_meals()
         entry = FakeConfigEntry()
@@ -140,6 +152,17 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attributes["meal_slots"][0]["status"], "opłacone")
         self.assertEqual(attributes["meal_slots"][0]["status_code"], MEAL_STATUS_PAID)
 
+        coordinator.data = _account_data(_child_after_refresh())
+
+        self.assertEqual(today_status.native_value, "odwołane")
+        self.assertEqual(today_menu.extra_state_attributes["status"], "odwołane")
+        self.assertEqual(
+            today_menu.extra_state_attributes["status_code"],
+            MEAL_STATUS_CANCELLED,
+        )
+        self.assertEqual(next_month.native_value, "opłacone")
+        self.assertEqual(unpaid.native_value, Decimal("7.50"))
+
     async def test_binary_sensor_setup_exposes_read_only_flags(self) -> None:
         child = _child_with_meals()
         entry = FakeConfigEntry()
@@ -169,6 +192,14 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_entity_by_key(entities, "has_food_tomorrow").is_on)
         self.assertTrue(_entity_by_key(entities, "can_cancel_today_meal").is_on)
         self.assertFalse(_entity_by_key(entities, "can_cancel_tomorrow_meal").is_on)
+
+        coordinator.data = _account_data(_child_after_refresh())
+
+        self.assertFalse(_entity_by_key(entities, "has_food_today").is_on)
+        self.assertFalse(_entity_by_key(entities, "can_cancel_today_meal").is_on)
+        self.assertFalse(
+            _entity_by_key(entities, "next_month_ordering_available").is_on
+        )
 
     async def test_multi_child_sensor_setup_creates_entities_per_child(self) -> None:
         first = _child_with_meals()
@@ -240,6 +271,59 @@ def _child_with_meals() -> StartEduChild:
                 order_number="ORDER-2026-05",
                 price=Decimal("20.50"),
                 can_cancel=False,
+            ),
+        ),
+    )
+
+
+def _child_after_refresh() -> StartEduChild:
+    return StartEduChild(
+        child_id="CHILD-ID-1",
+        name="Child 1",
+        current_month_order_status="paid",
+        next_month_order_status="paid",
+        next_month_ordering_available=False,
+        refund_available=Decimal("12.50"),
+        unpaid_amount=Decimal("7.50"),
+        meals=(
+            StartEduMeal(
+                meal_id="MEAL-26-LUNCH",
+                date=date(2026, 5, 26),
+                name="Obiad",
+                menu="ROSÓŁ. KOTLET. KOMPOT.",
+                meal_type=MEAL_TYPE_LUNCH,
+                child_id="CHILD-ID-1",
+                child_name="Child 1",
+                status=MEAL_STATUS_CANCELLED,
+                order_number="ORDER-2026-05",
+                price=Decimal("20.50"),
+                can_cancel=False,
+            ),
+            StartEduMeal(
+                meal_id="MEAL-26-SNACK",
+                date=date(2026, 5, 26),
+                name="Podwieczorek",
+                menu="jabłko.",
+                meal_type=MEAL_TYPE_AFTERNOON_SNACK,
+                child_id="CHILD-ID-1",
+                child_name="Child 1",
+                status=MEAL_STATUS_CANCELLED,
+                order_number="ORDER-2026-05",
+                price=Decimal("5.00"),
+                can_cancel=False,
+            ),
+            StartEduMeal(
+                meal_id="MEAL-01-LUNCH",
+                date=date(2026, 6, 1),
+                name="Obiad",
+                menu="Zupa.",
+                meal_type=MEAL_TYPE_LUNCH,
+                child_id="CHILD-ID-1",
+                child_name="Child 1",
+                status=MEAL_STATUS_PAID,
+                order_number="ORDER-2026-06",
+                price=Decimal("20.50"),
+                can_cancel=True,
             ),
         ),
     )

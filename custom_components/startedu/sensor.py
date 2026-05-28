@@ -260,19 +260,22 @@ class StartEduSensor(StartEduEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
-        if self.coordinator.data is None:
+        child = self.current_child
+        if self.coordinator.data is None or child is None:
             return None
-        return self.entity_description.value_fn(self._child, self.coordinator)
+        return self.entity_description.value_fn(child, self.coordinator)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        child = self.current_child
         if (
             self.coordinator.data is None
             or self.entity_description.attributes_fn is None
+            or child is None
         ):
             return None
         attributes = self.entity_description.attributes_fn(
-            self._child,
+            child,
             self.coordinator,
         )
         return attributes or None

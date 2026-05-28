@@ -127,6 +127,7 @@ class StartEduBinarySensor(StartEduEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        if self.coordinator.data is None:
+        child = self.current_child
+        if self.coordinator.data is None or child is None:
             return None
-        return self.entity_description.value_fn(self._child, self.coordinator)
+        return self.entity_description.value_fn(child, self.coordinator)
