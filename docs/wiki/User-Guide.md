@@ -68,7 +68,10 @@ have a menu in the calendar or menu sensor, but `has_food_*` will be off.
 ## Refreshing Data
 
 StartEdu menus are monthly, so the integration does not need to fetch data very
-often. The default automatic refresh is once per day.
+often. The default automatic polling interval is once per day. The integration
+also performs one morning refresh around `09:00` local time so today's
+cancellation availability does not stay stale after StartEdu closes the
+cancellation window.
 
 Use `button.<entry>_refresh_startedu_data` when you know something changed in
 StartEdu and you want Home Assistant to update now. A manual refresh fetches

@@ -234,6 +234,30 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
             _entity_by_key(entities, "next_month_ordering_available").is_on
         )
 
+    async def test_child_entities_do_not_reuse_stale_child_data(self) -> None:
+        child = _child_with_meals()
+        entry = FakeConfigEntry()
+        coordinator = FakeCoordinator(_account_data(child), entry)
+        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: coordinator}})
+        binary_entities = []
+        button_entities = []
+
+        await binary_sensor.async_setup_entry(hass, entry, binary_entities.extend)
+        await button.async_setup_entry(hass, entry, button_entities.extend)
+
+        can_cancel_today = _entity_by_key(binary_entities, "can_cancel_today_meal")
+        cancel_today = _entity_by_key(button_entities, "cancel_today_meals")
+        self.assertTrue(can_cancel_today.is_on)
+        self.assertTrue(cancel_today.available)
+
+        coordinator.data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 26, 7, 5, tzinfo=timezone.utc),
+            children=(),
+        )
+
+        self.assertIsNone(can_cancel_today.is_on)
+        self.assertFalse(cancel_today.available)
+
     async def test_button_setup_exposes_refresh_and_cancel_buttons(self) -> None:
         child = _child_with_meals()
         entry = FakeConfigEntry()

@@ -24,6 +24,8 @@ from custom_components.startedu.const import (
     PLATFORMS,
 )
 from custom_components.startedu.sync import (
+    CANCELLATION_AVAILABILITY_REFRESH_TIME,
+    next_cancellation_availability_refresh,
     next_future_date,
     next_local_midnight,
     next_local_month_start,
@@ -72,6 +74,34 @@ class SyncStrategyTests(unittest.TestCase):
         self.assertEqual(
             next_local_month_start(now),
             datetime(2027, 1, 1, 0, 0, tzinfo=ZoneInfo("Europe/Warsaw")),
+        )
+
+    def test_cancellation_availability_refresh_runs_every_morning(self) -> None:
+        self.assertEqual(CANCELLATION_AVAILABILITY_REFRESH_TIME.hour, 9)
+        before_cutoff = datetime(
+            2026,
+            5,
+            26,
+            8,
+            30,
+            tzinfo=ZoneInfo("Europe/Warsaw"),
+        )
+        after_cutoff = datetime(
+            2026,
+            5,
+            26,
+            9,
+            30,
+            tzinfo=ZoneInfo("Europe/Warsaw"),
+        )
+
+        self.assertEqual(
+            next_cancellation_availability_refresh(before_cutoff),
+            datetime(2026, 5, 26, 9, 0, tzinfo=ZoneInfo("Europe/Warsaw")),
+        )
+        self.assertEqual(
+            next_cancellation_availability_refresh(after_cutoff),
+            datetime(2026, 5, 27, 9, 0, tzinfo=ZoneInfo("Europe/Warsaw")),
         )
 
     def test_next_order_opening_refresh_uses_nearest_future_date(self) -> None:

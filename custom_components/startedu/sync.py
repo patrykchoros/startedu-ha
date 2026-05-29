@@ -11,6 +11,8 @@ from .const import (
     MIN_SCAN_INTERVAL_MINUTES,
 )
 
+CANCELLATION_AVAILABILITY_REFRESH_TIME = time(9, 0)
+
 
 def scan_interval_minutes(options: Mapping[str, Any]) -> int:
     """Return the configured polling interval clamped to supported bounds."""
@@ -32,6 +34,19 @@ def next_local_month_start(now: datetime) -> datetime:
     if now.month == 12:
         return datetime(now.year + 1, 1, 1, tzinfo=now.tzinfo)
     return datetime(now.year, now.month + 1, 1, tzinfo=now.tzinfo)
+
+
+def next_local_time(now: datetime, target_time: time) -> datetime:
+    """Return the next occurrence of target_time in now's local timezone."""
+    candidate = datetime.combine(now.date(), target_time, tzinfo=now.tzinfo)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def next_cancellation_availability_refresh(now: datetime) -> datetime:
+    """Return the next full refresh for same-day cancellation availability."""
+    return next_local_time(now, CANCELLATION_AVAILABILITY_REFRESH_TIME)
 
 
 def next_future_date(dates: tuple[date, ...], today: date) -> date | None:
