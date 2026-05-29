@@ -17,6 +17,7 @@ from .const import (
 )
 from .models import StartEduAccountData
 from .sync import (
+    next_cancellation_availability_refresh,
     next_future_date,
     next_local_midnight,
     next_local_month_start,
@@ -51,12 +52,14 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
         self.entry = entry
         self._day_rollover_unsub: CALLBACK_TYPE | None = None
         self._month_rollover_unsub: CALLBACK_TYPE | None = None
+        self._cancellation_availability_unsub: CALLBACK_TYPE | None = None
         self._next_order_opening_unsub: CALLBACK_TYPE | None = None
         self.sync_activity = SYNC_ACTIVITY_WAITING
         self.last_sync_status: str | None = None
         self.last_sync_time: datetime | None = None
         self._schedule_day_rollover()
         self._schedule_month_rollover()
+        self._schedule_cancellation_availability_refresh()
         entry.async_on_unload(self.cancel_scheduled_refreshes)
 
     def apply_options(self) -> None:
@@ -86,12 +89,14 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
         for unsubscribe in (
             self._day_rollover_unsub,
             self._month_rollover_unsub,
+            self._cancellation_availability_unsub,
             self._next_order_opening_unsub,
         ):
             if unsubscribe is not None:
                 unsubscribe()
         self._day_rollover_unsub = None
         self._month_rollover_unsub = None
+        self._cancellation_availability_unsub = None
         self._next_order_opening_unsub = None
 
     @callback
@@ -117,6 +122,16 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
             self.hass,
             self._handle_full_refresh_schedule,
             next_local_month_start(dt_util.now()),
+        )
+
+    @callback
+    def _schedule_cancellation_availability_refresh(self) -> None:
+        if self._cancellation_availability_unsub is not None:
+            self._cancellation_availability_unsub()
+        self._cancellation_availability_unsub = async_track_point_in_time(
+            self.hass,
+            self._handle_full_refresh_schedule,
+            next_cancellation_availability_refresh(dt_util.now()),
         )
 
     @callback
@@ -146,6 +161,7 @@ class StartEduDataUpdateCoordinator(DataUpdateCoordinator[StartEduAccountData]):
     @callback
     def _handle_full_refresh_schedule(self, *_: object) -> None:
         self._schedule_month_rollover()
+        self._schedule_cancellation_availability_refresh()
         self.hass.async_create_task(self.async_request_refresh())
 
     async def _async_update_data(self) -> StartEduAccountData:

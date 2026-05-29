@@ -295,6 +295,28 @@ class StartEduClientParserTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertEqual(parse_refunds_html(refunds_html), Decimal("20.50"))
+        multiple_rows_html = """
+        <html>
+          <body>
+            <h1>Zwroty za posiłki</h1>
+            <p>Aktualnie 41,00 zł jest dostępne do zwrotu.</p>
+            <table>
+              <tr><th>Data</th><th>Wartość</th><th>Typ</th></tr>
+              <tr>
+                <td>28 maja 2026</td>
+                <td>20,50 zł</td>
+                <td>Zwrot za odwołany posiłek</td>
+              </tr>
+              <tr>
+                <td>29 maja 2026</td>
+                <td>20,50 zł</td>
+                <td>Zwrot za odwołany posiłek</td>
+              </tr>
+            </table>
+          </body>
+        </html>
+        """
+        self.assertEqual(parse_refunds_html(multiple_rows_html), Decimal("41.00"))
         self.assertEqual(
             parse_refunds_html("<html><body><h1>Zwroty za posiłki</h1></body></html>"),
             Decimal("0"),

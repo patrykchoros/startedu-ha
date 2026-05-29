@@ -177,7 +177,11 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(coordinator.update_interval, timedelta(minutes=120))
-        self.assertEqual(len(hass.tracked_points), 2)
+        self.assertEqual(len(hass.tracked_points), 3)
+        self.assertIn(
+            datetime(2026, 5, 26, 9, 0, tzinfo=timezone.utc),
+            hass.tracked_points,
+        )
         self.assertEqual(len(entry.unload_callbacks), 1)
 
         result = await coordinator._async_update_data()
@@ -190,13 +194,39 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
             datetime(2026, 5, 26, 8, 30, tzinfo=timezone.utc),
         )
         self.assertEqual(coordinator.listener_updates, 2)
-        self.assertEqual(len(hass.tracked_points), 3)
+        self.assertEqual(len(hass.tracked_points), 4)
         self.assertEqual(hass.tracked_points[-1].date(), date(2026, 6, 15))
 
         entry.options["scan_interval"] = "90"
         coordinator.apply_options()
 
         self.assertEqual(coordinator.update_interval, timedelta(minutes=90))
+
+    async def test_scheduled_full_refresh_reschedules_morning_refresh(self) -> None:
+        account_data = StartEduAccountData(
+            fetched_at=datetime(2026, 5, 26, tzinfo=timezone.utc),
+            children=(),
+        )
+        hass = FakeHass()
+        coordinator = StartEduDataUpdateCoordinator(
+            hass,
+            FakeClient(account_data),
+            FakeEntry(),
+        )
+
+        coordinator._handle_full_refresh_schedule()
+        result = await hass.created_tasks[0]
+
+        self.assertIs(result, account_data)
+        self.assertEqual(coordinator.last_sync_status, SYNC_RESULT_SUCCESSFUL)
+        self.assertIn(
+            datetime(2026, 5, 26, 9, 0, tzinfo=timezone.utc),
+            hass.cancelled_points,
+        )
+        self.assertIn(
+            datetime(2026, 5, 26, 9, 0, tzinfo=timezone.utc),
+            hass.tracked_points,
+        )
 
     async def test_startedu_connection_failure_becomes_update_failed(self) -> None:
         coordinator = StartEduDataUpdateCoordinator(
